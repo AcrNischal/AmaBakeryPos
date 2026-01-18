@@ -1,10 +1,13 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from .models import User
 
 
 class UsersSerializers(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
+    password = serializers.CharField(
+        write_only=True, required=True, validators=[validate_password]
+    )
 
     class Meta:
         model = User
@@ -28,8 +31,5 @@ class UsersSerializers(serializers.ModelSerializer):
         """Use Django's create_user method which handles password hashing"""
         password = validated_data.pop("password", None)
 
-        user = User.objects.create_user(
-            **validated_data,  # This unpacks: username, email, phone, full_name, user_type
-            password=password,
-        )
+        user = User.objects.create_user(**validated_data, password=password)
         return user
