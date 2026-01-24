@@ -47,8 +47,8 @@ export default function PaymentCollection() {
 
     toast.success("Payment Received!", {
       description: method === 'cash' && change > 0
-        ? `Change to return: ₹${change.toFixed(2)}`
-        : `Table ${selectedOrder.tableNumber} - ₹${selectedOrder.total} paid via ${method}`,
+        ? `Change to return: Rs.${change.toFixed(2)}`
+        : `Table ${selectedOrder.tableNumber} - Rs.${selectedOrder.total} paid via ${method}`,
       icon: <CheckCircle2 className="h-5 w-5 text-success" />
     });
 
@@ -128,14 +128,14 @@ export default function PaymentCollection() {
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between">
                       <span>{item.quantity}× {item.menuItem.name}</span>
-                      <span>₹{item.menuItem.price * item.quantity}</span>
+                      <span>Rs.{item.menuItem.price * item.quantity}</span>
                     </div>
                   ))}
                 </div>
 
                 <div className="flex justify-between items-center mt-3 pt-3 border-t">
                   <span className="font-medium">Total</span>
-                  <span className="text-xl font-bold text-primary">₹{order.total}</span>
+                  <span className="text-xl font-bold text-primary">Rs.{order.total}</span>
                 </div>
               </button>
             ))}
@@ -154,7 +154,7 @@ export default function PaymentCollection() {
             <div className="space-y-4">
               <div className="text-center py-4 bg-muted/50 rounded-lg">
                 <p className="text-muted-foreground">Amount Due</p>
-                <p className="text-4xl font-bold text-primary">₹{selectedOrder.total}</p>
+                <p className="text-4xl font-bold text-primary">Rs.{selectedOrder.total}</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Table {selectedOrder.tableNumber}
                 </p>
@@ -198,13 +198,13 @@ export default function PaymentCollection() {
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
                 <span className="text-muted-foreground font-medium">Total Bill</span>
-                <span className="text-xl font-black text-primary">₹{selectedOrder?.total.toFixed(2)}</span>
+                <span className="text-xl font-black text-primary">Rs.{selectedOrder?.total.toFixed(2)}</span>
               </div>
 
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Amount Received</Label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground text-xl">₹</div>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground text-xl">Rs.</div>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -221,7 +221,7 @@ export default function PaymentCollection() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Change to Return</p>
-                      <p className="text-3xl font-black">₹{(parseFloat(cashReceived) - (selectedOrder?.total || 0)).toFixed(2)}</p>
+                      <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - (selectedOrder?.total || 0)).toFixed(2)}</p>
                     </div>
                     <div className="h-12 w-12 rounded-full bg-success/20 flex items-center justify-center">
                       <IndianRupee className="h-6 w-6" />
@@ -328,9 +328,9 @@ export default function PaymentCollection() {
                       <div key={idx} className="flex justify-between items-start gap-4 text-sm font-medium">
                         <div className="flex-1">
                           <p className="text-slate-800 leading-tight">{item.menuItem.name}</p>
-                          <p className="text-[10px] text-slate-400">{item.quantity} x ₹{item.menuItem.price}</p>
+                          <p className="text-[10px] text-slate-400">{item.quantity} x Rs.{item.menuItem.price}</p>
                         </div>
-                        <p className="text-slate-800 font-bold whitespace-nowrap">₹{(item.menuItem.price * item.quantity).toFixed(2)}</p>
+                        <p className="text-slate-800 font-bold whitespace-nowrap">Rs.{(item.menuItem.price * item.quantity).toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
@@ -342,21 +342,21 @@ export default function PaymentCollection() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-slate-500 font-medium">
                     <span>Subtotal</span>
-                    <span>₹{(completedOrder.total / 1.05).toFixed(2)}</span>
+                    <span>Rs.{(completedOrder.total / 1.05).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-500 font-medium">
                     <span>Tax (5%)</span>
-                    <span>₹{(completedOrder.total - (completedOrder.total / 1.05)).toFixed(2)}</span>
+                    <span>Rs.{(completedOrder.total - (completedOrder.total / 1.05)).toFixed(2)}</span>
                   </div>
                   {completedChange > 0 && (
                     <div className="flex justify-between text-sm text-success font-bold">
                       <span>Change Given</span>
-                      <span>₹{completedChange.toFixed(2)}</span>
+                      <span>Rs.{completedChange.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="pt-2 flex justify-between items-center">
                     <span className="text-lg font-black text-slate-900 leading-none">Total</span>
-                    <span className="text-2xl font-black text-primary leading-none">₹{completedOrder.total.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-primary leading-none">Rs.{completedOrder.total.toFixed(2)}</span>
                   </div>
                   {completedOrder.paymentMethod && (
                     <div className="text-center pt-2">

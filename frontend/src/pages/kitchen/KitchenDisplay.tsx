@@ -1,15 +1,45 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/kitchen/OrderCard";
-import { sampleOrders, Order } from "@/lib/mockData";
+import { sampleOrders, Order, branches, User, getCategories } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
-import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw } from "lucide-react";
+import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw, MapPin, Utensils, Coffee } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 
 export default function KitchenDisplay() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>(sampleOrders);
+
+  // Get current user and branch
+  const storedUser = localStorage.getItem('currentUser');
+  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
+  const branch = branches.find(b => b.id === user?.branchId);
+
+  // Determine Kitchen Type
+  const kitchenType = user?.kitchenType || 'main'; // Default to 'main' if not specified
+  const isBreakfastKitchen = kitchenType === 'breakfast';
+
+  // Define Category Mapping
+  // Get categories from configuration (supports dynamic updates from Admin Menu)
+  const categories = getCategories();
+  const relevantCategories = categories
+    .filter(c => c.type === (isBreakfastKitchen ? 'breakfast' : 'main'))
+    .map(c => c.name);
+
+  // Filter Orders Logic
+  const filteredOrders = orders.map(order => {
+    // Filter items based on category
+    const relevantItems = order.items.filter(item =>
+      relevantCategories.includes(item.menuItem.category)
+    );
+
+    // Return order with ONLY relevant items, or null if no items match
+    if (relevantItems.length > 0) {
+      return { ...order, items: relevantItems };
+    }
+    return null;
+  }).filter(Boolean) as Order[]; // Remove nulls
 
   const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
     setOrders(prev => prev.map(order =>
@@ -35,24 +65,32 @@ export default function KitchenDisplay() {
       <header className="flex-none bg-white border-b px-6 py-4 shadow-sm z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ChefHat className="h-6 w-6" />
+            <div className={`flex h - 10 w - 10 items - center justify - center rounded - lg ${isBreakfastKitchen ? 'bg-orange-100 text-orange-600' : 'bg-primary/10 text-primary'} `}>
+              {isBreakfastKitchen ? <Utensils className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Kitchen Display</h1>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h1 className="text-xl font-bold text-foreground">
+                  {isBreakfastKitchen ? 'Breakfast Kitchen' : 'Main Kitchen'}
+                </h1>
+                <div className="bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-primary/10 flex items-center gap-1">
+                  <MapPin className="h-2 w-2" />
+                  {branch?.name || "Global"}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
                 <div className="flex items-center gap-2">
                   <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Feed
+                  Live Feed • {user?.name || "Chef"}
                 </div>
-                <div className="h-4 w-px bg-slate-200" />
+                <div className="h-3 w-px bg-slate-200" />
 
                 {/* Completed Orders Sheet */}
                 <Sheet>
                   <SheetTrigger asChild>
                     <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded-full cursor-pointer hover:bg-slate-200 transition-colors">
                       <span className="text-xs font-medium text-slate-500">Completed today:</span>
-                      <span className="text-xs font-bold text-slate-700">{orders.filter(o => o.status === 'completed').length}</span>
+                      <span className="text-xs font-bold text-slate-700">{filteredOrders.filter(o => o.status === 'completed').length}</span>
                     </div>
                   </SheetTrigger>
                   <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
@@ -64,13 +102,13 @@ export default function KitchenDisplay() {
                     </SheetHeader>
 
                     <div className="space-y-4">
-                      {orders.filter(o => o.status === 'completed').length === 0 ? (
+                      {filteredOrders.filter(o => o.status === 'completed').length === 0 ? (
                         <div className="text-center py-12 text-slate-400">
                           <Clock className="h-12 w-12 mx-auto mb-3 opacity-20" />
                           <p>No completed orders yet today</p>
                         </div>
                       ) : (
-                        orders
+                        filteredOrders
                           .filter(o => o.status === 'completed')
                           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                           .map(order => (
@@ -113,9 +151,12 @@ export default function KitchenDisplay() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/')} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Exit KDS
+          <Button variant="outline" size="sm" onClick={() => {
+            localStorage.removeItem('currentUser');
+            navigate('/');
+          }} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
+            <LogOut className="h-3.5 w-3.5" />
+            Sign Out
           </Button>
         </div>
       </header>
@@ -131,11 +172,11 @@ export default function KitchenDisplay() {
                 <h2 className="font-bold text-slate-800">New Orders</h2>
               </div>
               <span className="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-md text-xs">
-                {orders.filter(o => o.status === 'new').length}
+                {filteredOrders.filter(o => o.status === 'new').length}
               </span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 scrollbar-thin scrollbar-thumb-slate-200">
-              {orders.filter(o => o.status === 'new').length === 0 ? (
+              {filteredOrders.filter(o => o.status === 'new').length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                   <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mb-2">
                     <Bell className="h-6 w-6 opacity-20" />
@@ -144,7 +185,7 @@ export default function KitchenDisplay() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
-                  {orders
+                  {filteredOrders
                     .filter(o => o.status === 'new')
                     .map(order => (
                       <OrderCard
@@ -166,17 +207,17 @@ export default function KitchenDisplay() {
                 <h2 className="font-bold text-slate-800">Ready to Serve</h2>
               </div>
               <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-md text-xs">
-                {orders.filter(o => o.status === 'ready').length}
+                {filteredOrders.filter(o => o.status === 'ready').length}
               </span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 scrollbar-thin scrollbar-thumb-slate-200">
-              {orders.filter(o => o.status === 'ready').length === 0 ? (
+              {filteredOrders.filter(o => o.status === 'ready').length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                   <div className="w-12 h-1 border-2 border-slate-200 rounded-full opacity-50" />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
-                  {orders
+                  {filteredOrders
                     .filter(o => o.status === 'ready')
                     .map(order => (
                       <OrderCard

@@ -1,12 +1,13 @@
 import { StatCard } from "@/components/admin/StatCard";
-import { analyticsData, tables, sampleOrders } from "@/lib/mockData";
+import { analyticsData, tables, sampleOrders, branches, User } from "@/lib/mockData";
 import {
   DollarSign,
   ShoppingBag,
   TrendingUp,
   Clock,
   UtensilsCrossed,
-  Coffee
+  Coffee,
+  MapPin
 } from "lucide-react";
 import {
   BarChart,
@@ -25,6 +26,11 @@ import { StatusBadge } from "@/components/ui/status-badge";
 const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(199, 89%, 48%)'];
 
 export default function AdminDashboard() {
+  // Get current user and branch
+  const storedUser = localStorage.getItem('currentUser');
+  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
+  const branch = branches.find(b => b.id === user?.branchId);
+
   const liveTableStatus = {
     available: tables.filter(t => t.status === 'available').length,
     occupied: tables.filter(t => t.status !== 'available').length,
@@ -35,8 +41,14 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Welcome back! Here's what's happening today.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+            <div className="bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border border-primary/20">
+              <MapPin className="h-3 w-3" />
+              {branch?.name || "Global"}
+            </div>
+          </div>
+          <p className="text-sm md:text-base text-muted-foreground">Welcome back, {user?.name || "Admin"}! Here's what's happening at your branch today.</p>
         </div>
         <div className="flex items-center justify-between sm:block sm:text-right w-full sm:w-auto">
           <p className="text-sm text-muted-foreground">Today</p>
@@ -48,7 +60,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Today's Sales"
-          value={`₹${analyticsData.todaySales.toLocaleString()}`}
+          value={`Rs.${analyticsData.todaySales.toLocaleString()}`}
           icon={DollarSign}
           trend={{ value: 12, isPositive: true }}
         />
@@ -60,7 +72,7 @@ export default function AdminDashboard() {
         />
         <StatCard
           title="Avg Order Value"
-          value={`₹${analyticsData.avgOrderValue}`}
+          value={`Rs.${analyticsData.avgOrderValue}`}
           icon={TrendingUp}
           trend={{ value: 3, isPositive: true }}
         />
@@ -133,7 +145,7 @@ export default function AdminDashboard() {
                   />
                   <span>{item.category}</span>
                 </div>
-                <span className="font-medium">₹{item.revenue.toLocaleString()}</span>
+                <span className="font-medium">Rs.{item.revenue.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -193,7 +205,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-muted-foreground">{item.count} orders</p>
                   </div>
                 </div>
-                <span className="font-semibold text-primary">₹{item.revenue.toLocaleString()}</span>
+                <span className="font-semibold text-primary">Rs.{item.revenue.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -241,7 +253,7 @@ export default function AdminDashboard() {
                     <StatusBadge status={order.status} className="shadow-none border h-6 px-2.5" />
                   </td>
                   <td className="px-6 py-4 text-right font-semibold">
-                    ₹{order.total}
+                    Rs.{order.total}
                   </td>
                 </tr>
               ))}

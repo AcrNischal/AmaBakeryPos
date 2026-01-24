@@ -124,7 +124,7 @@ export default function AdminReports() {
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px'
                   }}
-                  formatter={(value: number) => `₹${value.toLocaleString()}`}
+                  formatter={(value: number) => `Rs.${value.toLocaleString()}`}
                 />
                 <Line 
                   type="monotone" 
@@ -141,7 +141,7 @@ export default function AdminReports() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="card-elevated p-4 text-center">
               <p className="text-sm text-muted-foreground">Total Sales</p>
-              <p className="text-2xl font-bold text-primary">₹{analyticsData.weekSales.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-primary">Rs.{analyticsData.weekSales.toLocaleString()}</p>
             </div>
             <div className="card-elevated p-4 text-center">
               <p className="text-sm text-muted-foreground">Total Orders</p>
@@ -149,7 +149,7 @@ export default function AdminReports() {
             </div>
             <div className="card-elevated p-4 text-center">
               <p className="text-sm text-muted-foreground">Avg Order</p>
-              <p className="text-2xl font-bold">₹489</p>
+              <p className="text-2xl font-bold">Rs.489</p>
             </div>
             <div className="card-elevated p-4 text-center">
               <p className="text-sm text-muted-foreground">Growth</p>
@@ -199,7 +199,7 @@ export default function AdminReports() {
                     <td className="px-6 py-4 font-medium">{item.name}</td>
                     <td className="px-6 py-4">{item.count}</td>
                     <td className="px-6 py-4 text-right font-semibold text-primary">
-                      ₹{item.revenue.toLocaleString()}
+                      Rs.{item.revenue.toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -243,7 +243,7 @@ export default function AdminReports() {
                   <tr key={staff.name} className="border-t">
                     <td className="px-6 py-4 font-medium">{staff.name}</td>
                     <td className="px-6 py-4">{staff.orders}</td>
-                    <td className="px-6 py-4">₹{staff.sales.toLocaleString()}</td>
+                    <td className="px-6 py-4">Rs.{staff.sales.toLocaleString()}</td>
                     <td className="px-6 py-4">
                       <span className="bg-success/10 text-success px-2 py-1 rounded-full text-sm font-medium">
                         ⭐ {staff.rating}

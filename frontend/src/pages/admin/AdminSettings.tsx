@@ -198,7 +198,7 @@ export default function AdminSettings() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label htmlFor="currency">Currency</Label>
-            <Input id="currency" defaultValue="INR (₹)" />
+            <Input id="currency" defaultValue="INR (Rs.)" />
           </div>
           <div>
             <Label htmlFor="timezone">Timezone</Label>

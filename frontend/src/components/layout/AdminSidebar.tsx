@@ -11,13 +11,15 @@ import {
   LogOut,
   ChefHat,
 } from "lucide-react";
+import { branches, User } from "@/lib/mockData";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: ClipboardList, label: "Orders", path: "/admin/dashboard/orders" },
   { icon: UtensilsCrossed, label: "Menu", path: "/admin/dashboard/menu" },
   { icon: Package, label: "Inventory", path: "/admin/dashboard/inventory" },
-  { icon: Users, label: "Users", path: "/admin/dashboard/users" },
+  { icon: Users, label: "Customers", path: "/admin/dashboard/customers" },
+  { icon: ChefHat, label: "Staff", path: "/admin/dashboard/users" },
   { icon: FileBarChart, label: "Reports", path: "/admin/dashboard/reports" },
   { icon: Settings, label: "Settings", path: "/admin/dashboard/settings" },
 ];
@@ -30,6 +32,11 @@ interface AdminSidebarProps {
 export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const location = useLocation();
 
+  // Get current user and branch
+  const storedUser = localStorage.getItem('currentUser');
+  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
+  const branch = branches.find(b => b.id === user?.branchId);
+
   return (
     <div className={cn("flex h-full flex-col gradient-espresso text-sidebar-foreground", className)}>
       {/* Logo */}
@@ -38,8 +45,10 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           <img src="/logos/logo2brown.jpeg" alt="Ama Bakery" className="h-full w-full object-cover" />
         </div>
         <div>
-          <h1 className="font-bold text-lg">Ama Bakery</h1>
-          <p className="text-xs text-sidebar-foreground/70">Admin Panel</p>
+          <h1 className="font-bold text-lg leading-none mb-1">Ama Bakery</h1>
+          <p className="text-[10px] text-sidebar-foreground font-black uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded-sm inline-block">
+            {branch?.name || "Admin Panel"}
+          </p>
         </div>
       </div>
 

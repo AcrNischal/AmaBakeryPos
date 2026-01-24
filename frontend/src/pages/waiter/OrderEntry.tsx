@@ -271,7 +271,7 @@ export default function OrderEntry() {
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-card border-t">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-muted-foreground">Total</span>
-                  <span className="text-2xl font-bold text-primary">₹{cartTotal}</span>
+                  <span className="text-2xl font-bold text-primary">Rs.{cartTotal}</span>
                 </div>
                 <Button
                   className="w-full btn-touch gradient-warm"
@@ -315,7 +315,7 @@ export default function OrderEntry() {
               </div>
               <span>View Cart</span>
             </div>
-            <span className="font-bold">₹{cartTotal}</span>
+            <span className="font-bold">Rs.{cartTotal}</span>
           </Button>
         </div>
       )}

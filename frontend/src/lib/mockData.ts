@@ -40,13 +40,39 @@ export interface Order {
   total: number;
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: 'cash' | 'online';
+  customerId?: string;
 }
 
 export interface User {
   id: string;
   name: string;
-  role: 'waiter' | 'kitchen' | 'supervisor' | 'admin' | 'counter';
-  pin: string;
+  role: 'waiter' | 'kitchen' | 'supervisor' | 'admin' | 'counter' | 'superadmin';
+  username: string;
+  password: string;
+  branchId?: string; // For branch-specific users; superadmin doesn't have this
+  kitchenType?: 'main' | 'breakfast'; // For kitchen staff only
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderDate: string;
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  location: string;
+  manager: string;
+  status: 'active' | 'inactive';
+  revenue: number;
+  orderCount: number;
+  image?: string;
+  staffCount: number;
 }
 
 // Menu Items
@@ -74,7 +100,7 @@ export const menuItems: MenuItem[] = [
   { id: 'd4', name: 'Mango Smoothie', price: 120, category: 'Beverages', available: true },
   { id: 'd5', name: 'Hot Chocolate', price: 100, category: 'Beverages', available: true },
 
-  // Snacks
+  // Snacks (Breakfast Items)
   { id: 's1', name: 'Veg Sandwich', price: 120, category: 'Snacks', available: true },
   { id: 's2', name: 'Cheese Toast', price: 80, category: 'Snacks', available: true },
   { id: 's3', name: 'Paneer Wrap', price: 140, category: 'Snacks', available: true },
@@ -118,6 +144,7 @@ export const sampleOrders: Order[] = [
     waiter: 'Rahul',
     total: 290,
     paymentStatus: 'pending',
+    customerId: 'c1',
   },
   {
     id: 'ord2',
@@ -133,6 +160,7 @@ export const sampleOrders: Order[] = [
     waiter: 'Priya',
     total: 650,
     paymentStatus: 'pending',
+    customerId: 'c3',
   },
   {
     id: 'ord3',
@@ -146,6 +174,7 @@ export const sampleOrders: Order[] = [
     waiter: 'Rahul',
     total: 390,
     paymentStatus: 'pending',
+    customerId: 'c1',
   },
   {
     id: 'ord4',
@@ -159,17 +188,63 @@ export const sampleOrders: Order[] = [
     waiter: 'Priya',
     total: 320,
     paymentStatus: 'pending',
+    customerId: 'c5',
   },
 ];
 
 // Users
 export const users: User[] = [
-  { id: 'u1', name: 'Rahul', role: 'waiter', pin: '1234' },
-  { id: 'u2', name: 'Priya', role: 'waiter', pin: '2345' },
-  { id: 'u3', name: 'Kitchen1', role: 'kitchen', pin: '1111' },
-  { id: 'u4', name: 'Admin', role: 'admin', pin: '0000' },
-  { id: 'u5', name: 'Counter', role: 'counter', pin: '1111' },
+  // Super Admin (no branch)
+  { id: 'u0', name: 'Super Admin', role: 'superadmin', username: 'superadmin', password: 'superadmin' },
+
+  // Kathmandu Main Branch (b1)
+  { id: 'u1', name: 'Rajdeep Sharma', role: 'admin', username: 'admin@kathmandu', password: 'admin123', branchId: 'b1' },
+  { id: 'u2', name: 'Rahul Kumar', role: 'waiter', username: 'rahul@kathmandu', password: 'rahul123', branchId: 'b1' },
+  { id: 'u3', name: 'Priya Sharma', role: 'waiter', username: 'priya@kathmandu', password: 'priya123', branchId: 'b1' },
+  { id: 'u4', name: 'Counter Staff KTM', role: 'counter', username: 'counter@kathmandu', password: 'counter123', branchId: 'b1' },
+  { id: 'u5', name: 'Chef Ramesh (Main)', role: 'kitchen', username: 'kitchen@kathmandu', password: 'kitchen123', branchId: 'b1', kitchenType: 'main' },
+  { id: 'u5b', name: 'Chef Suresh (Breakfast)', role: 'kitchen', username: 'kitchen-breakfast@kathmandu', password: 'kitchen123', branchId: 'b1', kitchenType: 'breakfast' },
+
+  // Pokhara Lakeside Branch (b2)
+  { id: 'u6', name: 'Anjali Gurung', role: 'admin', username: 'admin@pokhara', password: 'admin123', branchId: 'b2' },
+  { id: 'u7', name: 'Bikash Thapa', role: 'waiter', username: 'bikash@pokhara', password: 'bikash123', branchId: 'b2' },
+  { id: 'u8', name: 'Sita Rai', role: 'waiter', username: 'sita@pokhara', password: 'sita123', branchId: 'b2' },
+  { id: 'u9', name: 'Counter Staff PKR', role: 'counter', username: 'counter@pokhara', password: 'counter123', branchId: 'b2' },
+  { id: 'u10', name: 'Chef Binod', role: 'kitchen', username: 'kitchen@pokhara', password: 'kitchen123', branchId: 'b2', kitchenType: 'main' },
+
+  // Lalitpur Heritage Branch (b3)
+  { id: 'u11', name: 'Suresh Maharjan', role: 'admin', username: 'admin@lalitpur', password: 'admin123', branchId: 'b3' },
+  { id: 'u12', name: 'Anjana Shakya', role: 'waiter', username: 'anjana@lalitpur', password: 'anjana123', branchId: 'b3' },
+  { id: 'u13', name: 'Dipak Tamang', role: 'waiter', username: 'dipak@lalitpur', password: 'dipak123', branchId: 'b3' },
+  { id: 'u14', name: 'Counter Staff LTP', role: 'counter', username: 'counter@lalitpur', password: 'counter123', branchId: 'b3' },
+  { id: 'u15', name: 'Chef Sunil', role: 'kitchen', username: 'kitchen@lalitpur', password: 'kitchen123', branchId: 'b3', kitchenType: 'main' },
+
+  // Chitwan Express Branch (b4) - Inactive but has users
+  { id: 'u16', name: 'Bikash Chaudhary', role: 'admin', username: 'admin@chitwan', password: 'admin123', branchId: 'b4' },
+  { id: 'u17', name: 'Ramesh Tharu', role: 'waiter', username: 'ramesh@chitwan', password: 'ramesh123', branchId: 'b4' },
+  { id: 'u18', name: 'Counter Staff CTW', role: 'counter', username: 'counter@chitwan', password: 'counter123', branchId: 'b4' },
+  { id: 'u19', name: 'Chef Prakash', role: 'kitchen', username: 'kitchen@chitwan', password: 'kitchen123', branchId: 'b4', kitchenType: 'main' },
 ];
+
+// Categories Configuration
+export interface Category {
+  id: string;
+  name: string;
+  type: 'main' | 'breakfast';
+}
+
+export const initialCategories: Category[] = [
+  { id: 'cat1', name: 'Bakery', type: 'breakfast' },
+  { id: 'cat2', name: 'Coffee', type: 'main' },
+  { id: 'cat3', name: 'Beverages', type: 'main' },
+  { id: 'cat4', name: 'Snacks', type: 'breakfast' },
+];
+
+// Helper to get categories (simulating DB/LocalStorage)
+export const getCategories = (): Category[] => {
+  const stored = localStorage.getItem('categories');
+  return stored ? JSON.parse(stored) : initialCategories;
+};
 
 // Analytics Data
 export const analyticsData = {
@@ -219,4 +294,97 @@ export const inventoryItems = [
   { id: 'inv6', name: 'Paneer Wrap', unit: 'pcs', stock: 5, minStock: 5, category: 'Snacks' },
   { id: 'inv7', name: 'Fresh Orange Juice', unit: 'bottles', stock: 20, minStock: 10, category: 'Beverages' },
   { id: 'inv8', name: 'Cold Brew (Bottled)', unit: 'bottles', stock: 15, minStock: 5, category: 'Beverages' },
+];
+
+// Customers Data
+export const customers: Customer[] = [
+  {
+    id: 'c1',
+    name: 'Sarah Johnson',
+    email: 'sarah.j@example.com',
+    phone: '+977 9841234567',
+    totalOrders: 12,
+    totalSpent: 4500,
+    lastOrderDate: '2024-03-15'
+  },
+  {
+    id: 'c2',
+    name: 'Michael Chen',
+    email: 'm.chen@example.com',
+    phone: '+977 9801234567',
+    totalOrders: 8,
+    totalSpent: 2800,
+    lastOrderDate: '2024-03-18'
+  },
+  {
+    id: 'c3',
+    name: 'Anita Gurung',
+    email: 'anita.g@example.com',
+    phone: '+977 9851098765',
+    totalOrders: 25,
+    totalSpent: 12500,
+    lastOrderDate: '2024-03-20'
+  },
+  {
+    id: 'c4',
+    name: 'David Wilson',
+    email: 'david.w@example.com',
+    phone: '+977 9812345678',
+    totalOrders: 3,
+    totalSpent: 1200,
+    lastOrderDate: '2024-02-28'
+  },
+  {
+    id: 'c5',
+    name: 'Priya Sharma',
+    email: 'priya.s@example.com',
+    phone: '+977 9849876543',
+    totalOrders: 15,
+    totalSpent: 6200,
+    lastOrderDate: '2024-03-10'
+  }
+];
+
+// Branches Data
+export const branches: Branch[] = [
+  {
+    id: 'b1',
+    name: 'Kathmandu Main',
+    location: 'Lazimpat, Kathmandu',
+    manager: 'Rajdeep Sharma',
+    status: 'active',
+    revenue: 1250000,
+    orderCount: 4500,
+    staffCount: 15,
+  },
+  {
+    id: 'b2',
+    name: 'Pokhara Lakeside',
+    location: 'Lakeside, Pokhara',
+    manager: 'Anjali Gurung',
+    status: 'active',
+    revenue: 850000,
+    orderCount: 3200,
+    staffCount: 12,
+  },
+  {
+    id: 'b3',
+    name: 'Lalitpur Heritage',
+    location: 'Patan Durbar Square',
+    manager: 'Suresh Maharjan',
+    status: 'active',
+    revenue: 620000,
+    orderCount: 2100,
+    staffCount: 8,
+  },
+  {
+    id: 'b4',
+    name: 'Chitwan Express',
+    location: 'Bharatpur, Chitwan',
+    manager: 'Bikash Chaudhary',
+    status: 'inactive',
+    revenue: 0,
+    orderCount: 0,
+    staffCount: 5,
+  }
 ];

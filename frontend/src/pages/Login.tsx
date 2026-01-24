@@ -1,32 +1,56 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { User, Lock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { users } from "@/lib/mockData";
 
 export default function Login() {
     const navigate = useNavigate();
-    const { roleId } = useParams<{ roleId: string }>();
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
 
-    const roleTitle = roleId === 'admin' ? 'Administration' : 'Management';
-
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
 
-        // Static credentials check
-        const valid = (username === 'admin' && password === 'admin');
+        // Find user by username and password
+        const user = users.find(
+            u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+        );
 
-        if (valid) {
+        if (user) {
+            // Store user in localStorage for session management
+            localStorage.setItem('currentUser', JSON.stringify(user));
+
             toast.success("Login Successful", {
-                description: `Welcome to ${roleTitle}`,
+                description: `Welcome, ${user.name}!`,
             });
-            navigate('/admin/dashboard');
+
+            // Route user to appropriate interface based on role
+            switch (user.role) {
+                case 'superadmin':
+                    navigate('/super-admin/dashboard');
+                    break;
+                case 'admin':
+                    navigate('/admin/dashboard');
+                    break;
+                case 'waiter':
+                    localStorage.setItem('currentWaiter', JSON.stringify(user));
+                    navigate('/waiter/tables');
+                    break;
+                case 'counter':
+                    navigate('/counter/pos');
+                    break;
+                case 'kitchen':
+                    navigate('/kitchen/display');
+                    break;
+                default:
+                    navigate('/');
+            }
         } else {
             setError("Invalid credentials. Please try again.");
             toast.error("Login Failed", {
@@ -36,96 +60,138 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen gradient-cream flex flex-col items-center justify-center p-6 overflow-hidden">
-            {/* Header / Branding */}
-            <div className="text-center mb-6 animate-in fade-in zoom-in duration-700">
-                <div className="inline-flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-3xl bg-white shadow-warm mb-4 p-1 overflow-hidden border-2 border-primary/10">
-                    <img src="/logos/logo1white.jfif" alt="Ama Bakery Logo" className="h-full w-full object-cover" />
+        <div className="min-h-screen flex overflow-hidden">
+            {/* Left Side - Branding Banner */}
+            <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary via-primary/90 to-primary overflow-hidden">
+                {/* Decorative Elements */}
+                <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
+                    <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
                 </div>
-                <h1 className="text-2xl md:text-4xl font-rockwell tracking-tight text-slate-800 mb-1">Ama Bakery</h1>
-                <p className="text-primary/60 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-0.5 bg-primary/5 px-4 py-1 rounded-full inline-block border border-primary/10">Secure Admin Gateway</p>
-            </div>
 
-            {/* Login Card */}
-            <div className="w-full max-w-sm animate-slide-up">
-                <div className="card-elevated p-8 md:p-10 border-4 border-white flex flex-col shadow-2xl shadow-primary/5 rounded-[2.5rem]">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                            <ShieldCheck className="h-5 w-5" />
-                        </div>
-                        <div className="text-left">
-                            <h2 className="font-black text-slate-800 text-lg leading-none">Admin Sign-in</h2>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Authorized Access Only</p>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Username</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
-                                        <User className="h-4 w-4" />
-                                    </div>
-                                    <Input
-                                        type="text"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        className="pl-11 h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary transition-all font-bold text-slate-700 placeholder:text-slate-300"
-                                        placeholder="Username"
-                                        autoFocus
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Password</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
-                                        <Lock className="h-4 w-4" />
-                                    </div>
-                                    <Input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="pl-11 h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary transition-all font-bold text-slate-700 font-mono placeholder:text-slate-300"
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                            </div>
+                {/* Content */}
+                <div className="relative z-10 flex flex-col items-center justify-center w-full p-12 text-white">
+                    <div className="max-w-md text-center space-y-8">
+                        {/* Logo */}
+                        <div className="inline-flex items-center justify-center h-32 w-32 rounded-[2rem] bg-white shadow-2xl p-2 overflow-hidden mb-8">
+                            <img
+                                src="/logos/logo1white.jfif"
+                                alt="Ama Bakery Logo"
+                                className="h-full w-full object-cover"
+                            />
                         </div>
 
-                        {error && (
-                            <div className="bg-destructive/5 text-destructive text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl border border-destructive/10 animate-in slide-in-from-top-2 text-center">
-                                {error}
+                        {/* Brand Name */}
+                        <div className="space-y-2">
+                            <h1 className="text-5xl font-rockwell font-bold tracking-tight">
+                                Ama Bakery
+                            </h1>
+                            <p className="text-white/80 text-sm font-bold uppercase tracking-[0.3em]">
+                                Management Suite
+                            </p>
+                        </div>
+
+                        {/* Tagline */}
+                        <div className="pt-8 space-y-4">
+                            <p className="text-xl font-medium text-white/90">
+                                Streamline your bakery operations with our comprehensive point-of-sale and management system.
+                            </p>
+                            <div className="flex items-center justify-center gap-2 text-white/60 text-xs font-black uppercase tracking-widest">
+                                <div className="h-px w-12 bg-white/30" />
+                                <span>Secure Access Portal</span>
+                                <div className="h-px w-12 bg-white/30" />
                             </div>
-                        )}
-
-                        <Button
-                            type="submit"
-                            className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-95 gradient-warm text-white"
-                        >
-                            Log In Securely
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                    </form>
-
-                    <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 opacity-60 w-full text-slate-400">
-                        <Lock className="h-3 w-3" />
-                        <span className="text-[8px] font-black uppercase tracking-[0.2em]">Encrypted Terminal Session</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Back Button */}
-            <Button
-                variant="ghost"
-                onClick={() => navigate('/')}
-                className="mt-8 font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-primary transition-all hover:bg-white/50 rounded-full px-8 py-4"
-            >
-                <ArrowLeft className="h-3 w-3 mr-2" />
-                Back to Role Selection
-            </Button>
+            {/* Right Side - Login Form */}
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8 bg-gradient-cream">
+                <div className="w-full max-w-md space-y-8">
+                    {/* Mobile Logo - Only shows on small screens */}
+                    <div className="lg:hidden text-center mb-8">
+                        <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-white shadow-warm mb-4 p-1 overflow-hidden border-2 border-primary/10">
+                            <img src="/logos/logo1white.jfif" alt="Ama Bakery" className="h-full w-full object-cover" />
+                        </div>
+                        <h1 className="text-2xl font-rockwell font-bold text-slate-800">Ama Bakery</h1>
+                    </div>
+
+                    {/* Login Card */}
+                    <div className="bg-white rounded-[2rem] shadow-xl border-4 border-white p-8 md:p-10">
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-black text-slate-900 mb-2">Welcome Back</h2>
+                            <p className="text-slate-500 font-medium">Sign in to access your account</p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="space-y-5">
+                                {/* Username Field */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+                                        Username
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+                                            <User className="h-5 w-5" />
+                                        </div>
+                                        <Input
+                                            type="text"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            className="pl-12 h-14 bg-slate-50 border-2 border-slate-100 rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary focus:bg-white transition-all font-bold text-slate-800 placeholder:text-slate-400 text-base"
+                                            placeholder="Enter your username"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Password Field */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+                                        Password
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+                                            <Lock className="h-5 w-5" />
+                                        </div>
+                                        <Input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="pl-12 h-14 bg-slate-50 border-2 border-slate-100 rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary focus:bg-white transition-all font-bold text-slate-800 font-mono placeholder:text-slate-400 text-base"
+                                            placeholder="Enter your password"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="bg-red-50 text-red-700 text-sm font-semibold px-4 py-3 rounded-xl border border-red-100 animate-in slide-in-from-top-2">
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Login Button */}
+                            <Button
+                                type="submit"
+                                className="w-full h-14 rounded-xl text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-[1.02] active:scale-95 gradient-warm text-white"
+                            >
+                                Sign In
+                                <ArrowRight className="h-5 w-5 ml-2" />
+                            </Button>
+                        </form>
+
+                        {/* Footer Note */}
+                        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 font-medium">
+                                Secure authentication for all staff members
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
