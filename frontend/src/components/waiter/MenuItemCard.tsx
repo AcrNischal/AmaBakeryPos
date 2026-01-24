@@ -61,7 +61,7 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove, onSetQuantity }:
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-slate-800 truncate text-lg transition-colors">{item.name}</h3>
             <div className="flex items-center gap-2 mt-1">
-              <p className="text-primary font-black text-lg font-mono">₹{item.price}</p>
+              <p className="text-primary font-black text-lg font-mono">Rs.{item.price}</p>
               {quantity > 0 && (
                 <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
                   {quantity} Added

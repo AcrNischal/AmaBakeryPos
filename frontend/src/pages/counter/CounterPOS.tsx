@@ -251,7 +251,7 @@ export default function CounterPOS() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                             <Input
                                 placeholder="Search by product name or scan barcode..."
-                                className="pl-12 h-14 text-lg rounded-2xl border-2 focus:border-primary bg-white transition-all shadow-sm"
+                                className="pl-12 h-14 text-lg rounded-2xl border-2 border-slate-200 focus:border-primary bg-white transition-all shadow-sm focus:shadow-md"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -275,13 +275,13 @@ export default function CounterPOS() {
                     </div>
 
                     {/* Product Grid */}
-                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto pt-2 pb-10 px-2 custom-scrollbar -ml-2 -mr-2">
                         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                             {filteredItems.map(item => (
                                 <button
                                     key={item.id}
                                     onClick={() => addToCart(item)}
-                                    className="group flex flex-col justify-between bg-white rounded-[1.5rem] p-5 text-left border-2 border-transparent hover:border-primary transition-all hover:shadow-xl hover:shadow-primary/5 active:scale-95 min-h-[140px]"
+                                    className="group flex flex-col justify-between bg-white rounded-[1.5rem] p-5 text-left border-2 border-slate-200 hover:border-primary hover:bg-orange-50/50 hover:-translate-y-1 transition-all hover:shadow-2xl hover:shadow-primary/10 active:scale-95 min-h-[140px]"
                                 >
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-2">
@@ -299,7 +299,7 @@ export default function CounterPOS() {
                                     <div className="mt-4 flex items-end justify-between">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Price</span>
-                                            <span className="text-xl font-black text-slate-900 leading-none">₹{item.price}</span>
+                                            <span className="text-xl font-black text-slate-900 leading-none">Rs.{item.price}</span>
                                         </div>
                                         <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all group-hover:rotate-6 group-hover:scale-110">
                                             <Plus className="h-5 w-5" />
@@ -345,9 +345,9 @@ export default function CounterPOS() {
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="max-w-[180px]">
                                             <h4 className="font-bold text-sm text-slate-800 leading-tight">{cartItem.item.name}</h4>
-                                            <p className="text-[10px] text-slate-400 mt-1 font-bold">₹{cartItem.item.price} per unit</p>
+                                            <p className="text-[10px] text-slate-400 mt-1 font-bold">Rs.{cartItem.item.price} per unit</p>
                                         </div>
-                                        <span className="font-black text-slate-900">₹{(cartItem.item.price * cartItem.quantity).toFixed(2)}</span>
+                                        <span className="font-black text-slate-900">Rs.{(cartItem.item.price * cartItem.quantity).toFixed(2)}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -393,16 +393,16 @@ export default function CounterPOS() {
                         <div className="space-y-2">
                             <div className="flex justify-between text-sm font-medium text-slate-500">
                                 <span>Subtotal</span>
-                                <span>₹{subtotal.toFixed(2)}</span>
+                                <span>Rs.{subtotal.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm font-medium text-slate-500">
                                 <span>Tax (5%)</span>
-                                <span>₹{taxAmount.toFixed(2)}</span>
+                                <span>Rs.{taxAmount.toFixed(2)}</span>
                             </div>
                             <Separator />
                             <div className="flex justify-between items-center pt-2">
                                 <span className="text-lg font-black text-slate-800">Total Amount</span>
-                                <span className="text-3xl font-black text-primary">₹{total.toFixed(2)}</span>
+                                <span className="text-3xl font-black text-primary">Rs.{total.toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -489,7 +489,7 @@ export default function CounterPOS() {
                                     <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Cash Details</Label>
                                     <div className="space-y-1">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase">Total Payable</p>
-                                        <p className="text-2xl font-black text-slate-800">₹{total.toFixed(2)}</p>
+                                        <p className="text-2xl font-black text-slate-800">Rs.{total.toFixed(2)}</p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] text-slate-400 font-bold uppercase">Amount Received</Label>
@@ -505,7 +505,7 @@ export default function CounterPOS() {
                                     {cashReceived && parseFloat(cashReceived) >= total && (
                                         <div className="bg-success/10 p-4 rounded-2xl border border-success/20 animate-in zoom-in-95">
                                             <p className="text-[10px] uppercase font-black text-success/60">Change to return</p>
-                                            <p className="text-2xl font-black text-success">₹{(parseFloat(cashReceived) - total).toFixed(2)}</p>
+                                            <p className="text-2xl font-black text-success">Rs.{(parseFloat(cashReceived) - total).toFixed(2)}</p>
                                         </div>
                                     )}
                                 </div>
@@ -517,7 +517,7 @@ export default function CounterPOS() {
                                     </div>
                                     <div className="text-center">
                                         <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Total Payable</p>
-                                        <p className="text-3xl font-black text-primary">₹{total.toFixed(2)}</p>
+                                        <p className="text-3xl font-black text-primary">Rs.{total.toFixed(2)}</p>
                                     </div>
                                 </div>
                             ) : (
@@ -561,7 +561,7 @@ export default function CounterPOS() {
                     <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-3">
                         <div className="flex justify-between text-sm font-bold">
                             <span className="text-slate-400 uppercase tracking-widest text-[9px]">Total Amount</span>
-                            <span className="text-slate-800">₹{total.toFixed(2)}</span>
+                            <span className="text-slate-800">Rs.{total.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm font-bold">
                             <span className="text-slate-400 uppercase tracking-widest text-[9px]">Payment Method</span>
@@ -571,7 +571,7 @@ export default function CounterPOS() {
                             <div className="pt-3 border-t border-dashed border-slate-200">
                                 <div className="flex justify-between text-sm font-black text-success">
                                     <span className="uppercase tracking-widest text-[9px]">Change Returned</span>
-                                    <span>₹{(parseFloat(cashReceived) - total).toFixed(2)}</span>
+                                    <span>Rs.{(parseFloat(cashReceived) - total).toFixed(2)}</span>
                                 </div>
                             </div>
                         )}
@@ -629,7 +629,7 @@ export default function CounterPOS() {
                             {cart.map((ci, idx) => (
                                 <div key={idx} className="flex justify-between text-sm">
                                     <span className="text-left flex-1 font-medium">{ci.item.name} x {ci.quantity}</span>
-                                    <span className="font-bold">₹{(ci.item.price * ci.quantity).toFixed(2)}</span>
+                                    <span className="font-bold">Rs.{(ci.item.price * ci.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
@@ -639,7 +639,7 @@ export default function CounterPOS() {
                         <div className="space-y-1 text-lg">
                             <div className="flex justify-between font-black">
                                 <span className="text-slate-400">Total</span>
-                                <span className="text-primary text-2xl">₹{total.toFixed(2)}</span>
+                                <span className="text-primary text-2xl">Rs.{total.toFixed(2)}</span>
                             </div>
                         </div>
 

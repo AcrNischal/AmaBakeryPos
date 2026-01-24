@@ -133,7 +133,7 @@ export default function Checkout() {
 
         if (receivedAmount < total) {
             toast.error("Insufficient amount", {
-                description: `Need ₹${(total - receivedAmount).toFixed(2)} more`,
+                description: `Need Rs.${(total - receivedAmount).toFixed(2)} more`,
             });
             return;
         }
@@ -144,7 +144,7 @@ export default function Checkout() {
 
         toast.success("Payment Confirmed!", {
             description: change > 0
-                ? `Change to return: ₹${change.toFixed(2)}`
+                ? `Change to return: Rs.${change.toFixed(2)}`
                 : "Exact amount received",
             icon: <CheckCircle2 className="h-5 w-5 text-success" />,
         });
@@ -163,7 +163,7 @@ export default function Checkout() {
         setIsProcessing(true);
 
         toast.success("Payment Confirmed!", {
-            description: `Table ${state?.tableNumber} - ₹${total.toFixed(2)} paid via QR Code`,
+            description: `Table ${state?.tableNumber} - Rs.${total.toFixed(2)} paid via QR Code`,
             icon: <CheckCircle2 className="h-5 w-5 text-success" />,
         });
 
@@ -218,13 +218,13 @@ export default function Checkout() {
                     <Card className="card-elevated p-6 space-y-4">
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-muted-foreground">Order Total</span>
-                            <span className="font-bold text-lg text-primary">₹{total.toFixed(2)}</span>
+                            <span className="font-bold text-lg text-primary">Rs.{total.toFixed(2)}</span>
                         </div>
 
                         {changeAmount !== null && changeAmount > 0 && (
                             <div className="flex justify-between items-center pt-3 border-t">
                                 <span className="text-muted-foreground">Change Returned</span>
-                                <span className="font-bold text-lg text-success">₹{changeAmount.toFixed(2)}</span>
+                                <span className="font-bold text-lg text-success">Rs.{changeAmount.toFixed(2)}</span>
                             </div>
                         )}
 
@@ -334,9 +334,9 @@ export default function Checkout() {
                                             <div key={idx} className="flex justify-between items-start gap-4 text-sm font-medium">
                                                 <div className="flex-1">
                                                     <p className="text-slate-800 leading-tight">{item.item.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{item.quantity} x ₹{item.item.price}</p>
+                                                    <p className="text-[10px] text-slate-400">{item.quantity} x Rs.{item.item.price}</p>
                                                 </div>
-                                                <p className="text-slate-800 font-bold whitespace-nowrap">₹{(item.item.price * item.quantity).toFixed(2)}</p>
+                                                <p className="text-slate-800 font-bold whitespace-nowrap">Rs.{(item.item.price * item.quantity).toFixed(2)}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -348,21 +348,21 @@ export default function Checkout() {
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm text-slate-500 font-medium">
                                         <span>Subtotal</span>
-                                        <span>₹{subtotal.toFixed(2)}</span>
+                                        <span>Rs.{subtotal.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm text-slate-500 font-medium">
                                         <span>Tax (5%)</span>
-                                        <span>₹{taxAmount.toFixed(2)}</span>
+                                        <span>Rs.{taxAmount.toFixed(2)}</span>
                                     </div>
                                     {discountAmount > 0 && (
                                         <div className="flex justify-between text-sm text-success font-bold">
                                             <span>Discount ({discountPercent}%)</span>
-                                            <span>-₹{discountAmount.toFixed(2)}</span>
+                                            <span>-Rs.{discountAmount.toFixed(2)}</span>
                                         </div>
                                     )}
                                     <div className="pt-2 flex justify-between items-center">
                                         <span className="text-lg font-black text-slate-900 leading-none">Total</span>
-                                        <span className="text-2xl font-black text-primary leading-none">₹{total.toFixed(2)}</span>
+                                        <span className="text-2xl font-black text-primary leading-none">Rs.{total.toFixed(2)}</span>
                                     </div>
                                 </div>
 
@@ -432,7 +432,7 @@ export default function Checkout() {
                                 <div className="flex-1">
                                     <h3 className="font-medium">{cartItem.item.name}</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        ₹{cartItem.item.price} × {cartItem.quantity}
+                                        Rs.{cartItem.item.price} × {cartItem.quantity}
                                     </p>
                                     {cartItem.notes && (
                                         <p className="text-xs text-primary mt-1 flex items-center gap-1">
@@ -442,7 +442,7 @@ export default function Checkout() {
                                     )}
                                 </div>
                                 <span className="font-semibold text-lg">
-                                    ₹{(cartItem.item.price * cartItem.quantity).toFixed(2)}
+                                    Rs.{(cartItem.item.price * cartItem.quantity).toFixed(2)}
                                 </span>
                             </div>
                         ))}
@@ -454,12 +454,12 @@ export default function Checkout() {
                     <div className="space-y-2">
                         <div className="flex justify-between text-muted-foreground">
                             <span>Subtotal</span>
-                            <span>₹{subtotal.toFixed(2)}</span>
+                            <span>Rs.{subtotal.toFixed(2)}</span>
                         </div>
 
                         <div className="flex justify-between text-muted-foreground">
                             <span>Tax (5%)</span>
-                            <span>₹{taxAmount.toFixed(2)}</span>
+                            <span>Rs.{taxAmount.toFixed(2)}</span>
                         </div>
 
                         {discountPercent > 0 && (
@@ -468,7 +468,7 @@ export default function Checkout() {
                                     <Percent className="h-4 w-4" />
                                     Discount ({discountPercent}%)
                                 </span>
-                                <span>-₹{discountAmount.toFixed(2)}</span>
+                                <span>-Rs.{discountAmount.toFixed(2)}</span>
                             </div>
                         )}
 
@@ -692,13 +692,13 @@ export default function Checkout() {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-muted-foreground font-medium">Total Amount</span>
-                                    <span className="text-xl font-black text-primary">₹{total.toFixed(2)}</span>
+                                    <span className="text-xl font-black text-primary">Rs.{total.toFixed(2)}</span>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Amount Received</Label>
                                     <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground text-xl">₹</div>
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground text-xl">Rs.</div>
                                         <Input
                                             type="number"
                                             placeholder="0.00"
@@ -715,7 +715,7 @@ export default function Checkout() {
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Change to Return</p>
-                                                <p className="text-3xl font-black">₹{(parseFloat(cashReceived) - total).toFixed(2)}</p>
+                                                <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - total).toFixed(2)}</p>
                                             </div>
                                             <div className="h-12 w-12 rounded-full bg-success/20 flex items-center justify-center">
                                                 <IndianRupee className="h-6 w-6" />
@@ -767,7 +767,7 @@ export default function Checkout() {
                         <div className="p-8 text-center space-y-6">
                             <div className="space-y-1">
                                 <p className="text-muted-foreground text-sm font-medium">Customer Payment Amount</p>
-                                <p className="text-4xl font-black text-primary">₹{total.toFixed(2)}</p>
+                                <p className="text-4xl font-black text-primary">Rs.{total.toFixed(2)}</p>
                             </div>
 
                             <div className="relative group">
@@ -818,7 +818,7 @@ export default function Checkout() {
                 <div className="max-w-2xl mx-auto space-y-3">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>Total Amount</span>
-                        <span className="text-2xl font-bold text-primary">₹{total.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-primary">Rs.{total.toFixed(2)}</span>
                     </div>
 
                     <div className="flex gap-3">

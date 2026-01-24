@@ -123,7 +123,7 @@ export default function CounterOrders() {
                                                 <span className="text-sm font-medium text-slate-500">{format(order.createdAt, 'hh:mm a')}</span>
                                             </td>
                                             <td className="px-8 py-5">
-                                                <span className="font-black text-slate-900 text-lg">₹{order.total}</span>
+                                                <span className="font-black text-slate-900 text-lg">Rs.{order.total}</span>
                                             </td>
                                             <td className="px-8 py-5">
                                                 <StatusBadge status={order.status} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { menuItems, MenuItem } from "@/lib/mockData";
+import { menuItems, MenuItem, Category, getCategories } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -18,8 +18,7 @@ export default function AdminMenu() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // State for Categories Management
-  // Initialize with unique categories from mock data
-  const [categories, setCategories] = useState<string[]>([...new Set(menuItems.map(item => item.category))].sort());
+  const [categories, setCategories] = useState<Category[]>(getCategories());
   const [newCategoryInput, setNewCategoryInput] = useState("");
 
   const filteredItems = items.filter(item => {
@@ -27,6 +26,11 @@ export default function AdminMenu() {
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   }).sort((a, b) => a.name.localeCompare(b.name));
+
+  const updateCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+    localStorage.setItem('categories', JSON.stringify(newCategories));
+  };
 
   const handleToggleAvailability = (itemId: string) => {
     setItems(prev => prev.map(item =>
@@ -42,9 +46,14 @@ export default function AdminMenu() {
 
   const handleAddCategory = () => {
     if (newCategoryInput.trim()) {
-      if (!categories.includes(newCategoryInput.trim())) {
-        const updatedCategories = [...categories, newCategoryInput.trim()].sort();
-        setCategories(updatedCategories);
+      if (!categories.some(c => c.name === newCategoryInput.trim())) {
+        const newCategory: Category = {
+          id: `cat-${Date.now()}`,
+          name: newCategoryInput.trim(),
+          type: 'main' // Default to main
+        };
+        const updatedCategories = [...categories, newCategory].sort((a, b) => a.name.localeCompare(b.name));
+        updateCategories(updatedCategories);
         setNewCategoryInput("");
         toast.success("Category added");
       } else {
@@ -53,36 +62,42 @@ export default function AdminMenu() {
     }
   };
 
-  const handleDeleteCategory = (cat: string) => {
+  const handleDeleteCategory = (catName: string) => {
     // Check if category is in use
-    const isInUse = items.some(item => item.category === cat);
+    const isInUse = items.some(item => item.category === catName);
     if (isInUse) {
       toast.error("Cannot delete category attached to existing items");
       return;
     }
-    setCategories(prev => prev.filter(c => c !== cat));
+    updateCategories(categories.filter(c => c.name !== catName));
     toast.success("Category deleted");
   };
 
+  const handleUpdateCategoryType = (catId: string, newType: 'main' | 'breakfast') => {
+    const updated = categories.map(c => c.id === catId ? { ...c, type: newType } : c);
+    updateCategories(updated);
+    toast.success("Category kitchen assignment updated");
+  };
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Menu Management</h1>
-          <p className="text-muted-foreground">Manage your bakery items and categories</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Menu Management</h1>
+          <p className="text-sm text-muted-foreground">Manage your bakery items and categories</p>
         </div>
       </div>
 
       <Tabs defaultValue="items" className="w-full">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <TabsList className="grid w-full grid-cols-2 max-w-[300px]">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4">
+          <TabsList className="grid w-full grid-cols-2 max-w-full sm:max-w-[300px]">
             <TabsTrigger value="items">Menu Items</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
           </TabsList>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
@@ -97,18 +112,18 @@ export default function AdminMenu() {
                   <Input id="name" placeholder="Enter item name" defaultValue={editItem?.name} />
                 </div>
                 <div>
-                  <Label htmlFor="price">Price (₹)</Label>
+                  <Label htmlFor="price">Price (Rs.)</Label>
                   <Input id="price" type="number" placeholder="0" defaultValue={editItem?.price} />
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select defaultValue={editItem?.category || categories[0]}>
+                  <Select defaultValue={editItem?.category || categories[0]?.name}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -160,15 +175,15 @@ export default function AdminMenu() {
               >
                 All
               </Button>
-              {categories.sort().map(cat => (
+              {categories.map(cat => (
                 <Button
-                  key={cat}
-                  variant={categoryFilter === cat ? 'default' : 'outline'}
+                  key={cat.id}
+                  variant={categoryFilter === cat.name ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setCategoryFilter(cat)}
+                  onClick={() => setCategoryFilter(cat.name)}
                   className="whitespace-nowrap rounded-full"
                 >
-                  {cat}
+                  {cat.name}
                 </Button>
               ))}
             </div>
@@ -186,7 +201,7 @@ export default function AdminMenu() {
                     <h3 className="font-semibold text-foreground">{item.name}</h3>
                     <p className="text-sm text-muted-foreground">{item.category}</p>
                   </div>
-                  <span className="text-lg font-bold text-primary">₹{item.price}</span>
+                  <span className="text-lg font-bold text-primary">Rs.{item.price}</span>
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t">
@@ -247,17 +262,38 @@ export default function AdminMenu() {
             </div>
 
             <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm font-bold text-muted-foreground bg-slate-100/50 rounded-lg">
+                <div className="col-span-6">Category Name</div>
+                <div className="col-span-4">Kitchen Assignment</div>
+                <div className="col-span-2 text-right">Actions</div>
+              </div>
               {categories.map((category) => (
-                <div key={category} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 group">
-                  <span className="font-medium">{category}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                    onClick={() => handleDeleteCategory(category)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div key={category.id} className="grid grid-cols-12 gap-4 items-center p-3 bg-slate-50 rounded-lg border border-slate-100 group">
+                  <div className="col-span-6 font-medium">{category.name}</div>
+                  <div className="col-span-4">
+                    <Select
+                      value={category.type}
+                      onValueChange={(val: 'main' | 'breakfast') => handleUpdateCategoryType(category.id, val)}
+                    >
+                      <SelectTrigger className="h-8 text-xs font-bold uppercase tracking-wide bg-white border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="main">Main Kitchen</SelectItem>
+                        <SelectItem value="breakfast">Breakfast Kitchen</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all h-8 w-8 p-0"
+                      onClick={() => handleDeleteCategory(category.name)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

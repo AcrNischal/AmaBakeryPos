@@ -134,7 +134,7 @@ function OrderCard({ order }: { order: Order }) {
             {formatDistanceToNow(order.createdAt, { addSuffix: true })}
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-bold text-primary mr-2">₹{order.total}</span>
+            <span className="font-bold text-primary mr-2">Rs.{order.total}</span>
           </div>
         </div>
       </div>

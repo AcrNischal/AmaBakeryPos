@@ -99,7 +99,7 @@ export default function AdminOrders() {
                   <td className="px-6 py-4">
                     <StatusBadge status={order.paymentStatus} />
                   </td>
-                  <td className="px-6 py-4 text-right font-semibold">₹{order.total}</td>
+                  <td className="px-6 py-4 text-right font-semibold">Rs.{order.total}</td>
                   <td className="px-6 py-4 text-center">
                     <Button
                       variant="ghost"
@@ -156,7 +156,7 @@ export default function AdminOrders() {
                   {selectedOrder.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span>{item.quantity}× {item.menuItem.name}</span>
-                      <span className="font-medium">₹{item.menuItem.price * item.quantity}</span>
+                      <span className="font-medium">Rs.{item.menuItem.price * item.quantity}</span>
                     </div>
                   ))}
                 </div>
@@ -164,7 +164,7 @@ export default function AdminOrders() {
 
               <div className="border-t pt-4 flex justify-between">
                 <span className="font-semibold">Total</span>
-                <span className="text-xl font-bold text-primary">₹{selectedOrder.total}</span>
+                <span className="text-xl font-bold text-primary">Rs.{selectedOrder.total}</span>
               </div>
             </div>
           )}
