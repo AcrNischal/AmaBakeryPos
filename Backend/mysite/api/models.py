@@ -39,6 +39,7 @@ class User(AbstractUser):
 
     # UPDATED: Added the roles you need
     USER_TYPE_CHOICES = [
+        ("ADMIN", "Admin"),
         ("BRANCH_MANAGER", "Branch Manager"),  # Manages one branch
         ("WAITER", "Waiter"),  # Table service
         ("COUNTER", "Counter"),  # Cashier
@@ -68,4 +69,4 @@ class Product(models.Model):
     date_added = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = [ "name"]
+        unique_together = ["name"]
