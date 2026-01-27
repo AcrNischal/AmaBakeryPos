@@ -1,15 +1,18 @@
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes  # ADD THIS IMPORT
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 # custom
-from .serializer_dir.users_serializer import ChangePasswordSerializer
+from .serializer_dir.users_serializer import ChangePasswordSerializer, CustomTokenObtainPairSerializer
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
 
 UserView = UserViewClass
 ProductView = ProductViewClass
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
