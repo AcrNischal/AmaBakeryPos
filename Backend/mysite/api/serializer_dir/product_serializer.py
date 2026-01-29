@@ -22,6 +22,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "branch_id",  # ← Use this (read-only through category)
             "branch_name",  # ← Use this (read-only through category)
             "date_added",
+            "is_available",
         ]
         read_only_fields = [
             "id",
@@ -36,13 +37,10 @@ class ProductSerializer(serializers.ModelSerializer):
             "selling_price": {"required": True},
             "product_quantity": {"required": False, "default": 0},
             "low_stock_bar": {"required": False, "default": 0},
-            # REMOVE: "branch": {"required": True},  # ← Product doesn't have branch field!
             "category": {"required": True},  # Changed to True - product needs category!
         }
 
     def create(self, validated_data):
-        """Create product with defaults"""
-        # Use .pop() with defaults to handle missing values
         product_quantity = validated_data.pop("product_quantity", 0)
         low_stock_bar = validated_data.pop("low_stock_bar", 0)
 

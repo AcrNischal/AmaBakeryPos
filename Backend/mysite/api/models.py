@@ -67,6 +67,7 @@ class Product(models.Model):
     )
     low_stock_bar = models.IntegerField(default=0)
     date_added = models.DateTimeField(default=timezone.now)
+    is_available = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.name} - {self.category.branch.name}"

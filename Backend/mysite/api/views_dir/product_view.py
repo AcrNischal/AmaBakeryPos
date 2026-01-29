@@ -1,3 +1,4 @@
+from rest_framework import status
 from rest_framework.views import APIView, Response
 
 from ..models import Product
@@ -46,10 +47,36 @@ class ProductViewClass(APIView):
 
     def post(self, request):
         role = self.get_user_role(request.user)
-        # if role in ["SUPER_ADMIN","ADMIN"]:
+        my_branch = request.user.branch
+
+        if role == "BRANCH_MANAGER":
+            data = request.data.copy()
+            data["branch"] = my_branch.id
+
+            serializer = ProductSerializer(data=data, context={"request": request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(
+                    {
+                        "success": True,
+                        "message": "Product created successfully",
+                        "data": serializer.data,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+        else:
+            return Response(
+                {
+                    "success": True,
+                    "message": "You don't have Permission to  create Product!",
+                },
+            )
 
     def put(self, request, id=None):
-        pass
+        role = self.get_user_role(request.user)
+        my_branch = request.user.branch
+
+        if id:
 
     def delete(self, request, id=None):
         pass
