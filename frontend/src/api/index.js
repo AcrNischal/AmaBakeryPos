@@ -193,7 +193,7 @@ export async function createProduct(productData) {
 
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to create product");
-  return data.data || data.product;
+  return data.data; // Return the created product object
 }
 
 export async function updateProduct(id, productData) {
@@ -211,7 +211,7 @@ export async function updateProduct(id, productData) {
 
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to update product");
-  return data.data || data.product;
+  return data.data; // Return the updated product object
 }
 
 export async function deleteProduct(id) {

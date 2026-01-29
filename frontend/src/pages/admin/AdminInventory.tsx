@@ -2,11 +2,42 @@ import { useState, useEffect } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, AlertTriangle, Package, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Plus,
+  Search,
+  AlertTriangle,
+  Package,
+  Loader2,
+  Pencil,
+  Trash2,
+  Eye,
+  Info,
+  CheckCircle2,
+  XCircle,
+  Store,
+  Calendar,
+  Tag,
+  TrendingUp
+} from "lucide-react";
 import { toast } from "sonner";
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../../api/index.js";
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories } from "../../api/index.js";
 
 interface Product {
   id: number;
@@ -20,27 +51,42 @@ interface Product {
   branch_id: number;
   branch_name: string;
   date_added: string;
+  is_available: boolean;
+}
+
+interface BackendCategory {
+  id: number;
+  name: string;
+  branch: number;
+  branch_name: string;
 }
 
 export default function AdminInventory() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<BackendCategory[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
 
-  const loadProducts = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const data = await fetchProducts();
-      setProducts(data);
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts(),
+        fetchCategories()
+      ]);
+      setProducts(productsData);
+      setCategories(categoriesData);
     } catch (err: any) {
-      toast.error("Failed to load products", { description: err.message });
+      toast.error(err.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -57,6 +103,10 @@ export default function AdminInventory() {
     e.preventDefault();
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
+
+    // Get switch value manually
+    const is_available = e.currentTarget.querySelector<HTMLButtonElement>('[role="switch"]')?.['aria-checked' as any] === 'true';
+
     const payload = {
       name: formData.get("name"),
       cost_price: formData.get("cost_price"),
@@ -64,6 +114,7 @@ export default function AdminInventory() {
       product_quantity: parseInt(formData.get("product_quantity") as string),
       low_stock_bar: parseInt(formData.get("low_stock_bar") as string),
       category: parseInt(formData.get("category") as string),
+      is_available: is_available !== undefined ? is_available : true
     };
 
     try {
@@ -80,7 +131,7 @@ export default function AdminInventory() {
       setEditProduct(null);
     } catch (err: any) {
       console.error("Product operation error:", err);
-      toast.error("Operation failed", { description: err.message });
+      toast.error(err.message || "Operation failed");
     } finally {
       setSubmitting(false);
     }
@@ -94,7 +145,7 @@ export default function AdminInventory() {
       setProducts(prev => prev.filter(p => p.id !== productId));
       toast.success("Product deleted");
     } catch (err: any) {
-      toast.error("Delete failed", { description: err.message });
+      toast.error(err.message || "Delete failed");
     }
   };
 
@@ -102,7 +153,7 @@ export default function AdminInventory() {
     const cost = parseFloat(costPrice);
     const selling = parseFloat(sellingPrice);
     const profit = selling - cost;
-    const margin = ((profit / selling) * 100).toFixed(1);
+    const margin = selling > 0 ? ((profit / selling) * 100).toFixed(1) : "0.0";
     return { profit, margin };
   };
 
@@ -121,45 +172,61 @@ export default function AdminInventory() {
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl rounded-3xl">
             <DialogHeader>
-              <DialogTitle>{editProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight">
+                {editProduct ? 'Edit Product' : 'Add New Product'}
+              </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Product Name</Label>
-                <Input id="name" name="name" placeholder="Enter product name" defaultValue={editProduct?.name} required />
+            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
+                <Input id="name" name="name" className="h-12 text-lg rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" placeholder="Enter product name" defaultValue={editProduct?.name} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="cost_price">Cost Price (Rs.)</Label>
-                  <Input id="cost_price" name="cost_price" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.cost_price} required />
+                <div className="space-y-2">
+                  <Label htmlFor="cost_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
+                  <Input id="cost_price" name="cost_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.cost_price} required />
                 </div>
-                <div>
-                  <Label htmlFor="selling_price">Selling Price (Rs.)</Label>
-                  <Input id="selling_price" name="selling_price" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.selling_price} required />
+                <div className="space-y-2">
+                  <Label htmlFor="selling_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                  <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 font-bold text-primary" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.selling_price} required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="product_quantity">Current Stock</Label>
-                  <Input id="product_quantity" name="product_quantity" type="number" placeholder="0" defaultValue={editProduct?.product_quantity} required />
+                <div className="space-y-2">
+                  <Label htmlFor="product_quantity" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
+                  <Input id="product_quantity" name="product_quantity" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editProduct?.product_quantity} required />
                 </div>
-                <div>
-                  <Label htmlFor="low_stock_bar">Low Stock Alert</Label>
-                  <Input id="low_stock_bar" name="low_stock_bar" type="number" placeholder="0" defaultValue={editProduct?.low_stock_bar} required />
+                <div className="space-y-2">
+                  <Label htmlFor="low_stock_bar" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
+                  <Input id="low_stock_bar" name="low_stock_bar" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editProduct?.low_stock_bar} required />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="category">Category ID</Label>
-                <Input id="category" name="category" type="number" placeholder="Enter category ID" defaultValue={editProduct?.category} required />
-                <p className="text-xs text-muted-foreground mt-1">Note: Category management will be added in future updates</p>
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="category" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
+                  <Select name="category" defaultValue={editProduct?.category?.toString()}>
+                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-none shadow-2xl">
+                      {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id.toString()} className="rounded-xl my-1">{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-3 pb-2.5 pl-2">
+                  <Switch id="is_available" defaultChecked={editProduct?.is_available ?? true} />
+                  <Label htmlFor="is_available" className="text-sm font-bold text-slate-600">Available for Sale</Label>
+                </div>
               </div>
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-3 pt-6">
                 <Button
                   type="button"
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 h-12 rounded-2xl font-bold"
                   onClick={() => {
                     setIsDialogOpen(false);
                     setEditProduct(null);
@@ -167,7 +234,7 @@ export default function AdminInventory() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={submitting}>
+                <Button type="submit" className="flex-1 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20" disabled={submitting}>
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -183,9 +250,9 @@ export default function AdminInventory() {
         </Dialog>
       </div>
 
-      {/* Low Stock Alert */}
+      {/* Low Stock Alert Banner (User Style) */}
       {lowStockItems.length > 0 && (
-        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 transition-all animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3 mb-3">
             <AlertTriangle className="h-5 w-5 text-destructive" />
             <h3 className="font-semibold text-destructive">Low Stock Alert ({lowStockItems.length})</h3>
@@ -194,7 +261,7 @@ export default function AdminInventory() {
             {lowStockItems.map(product => (
               <span
                 key={product.id}
-                className="bg-destructive/20 text-destructive px-3 py-1 rounded-full text-sm font-medium"
+                className="bg-destructive/20 text-destructive px-3 py-1 rounded-full text-sm font-medium border border-destructive/20"
               >
                 {product.name}: {product.product_quantity} units
               </span>
@@ -203,24 +270,115 @@ export default function AdminInventory() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="card-elevated p-4 border-none shadow-sm bg-white mb-6">
+      {/* View Details Dialog (Mirrors Edit style) */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl overflow-hidden">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+              <Info className="h-6 w-6 text-primary" />
+              Product Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewProduct && (
+            <div className="space-y-6 pt-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
+                <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border-none text-slate-900">
+                  {viewProduct.name}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price</Label>
+                  <div className="h-12 px-4 flex items-center font-bold rounded-2xl bg-slate-50 border-none text-slate-600">
+                    Rs. {viewProduct.cost_price}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price</Label>
+                  <div className="h-12 px-4 flex items-center font-black rounded-2xl bg-slate-50 border-none text-primary">
+                    Rs. {viewProduct.selling_price}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
+                  <div className={`h-12 px-4 flex items-center font-black text-xl rounded-2xl bg-slate-50 border-none ${viewProduct.product_quantity <= viewProduct.low_stock_bar ? 'text-red-600' : 'text-slate-900'}`}>
+                    {viewProduct.product_quantity} Units
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
+                  <div className="h-12 px-4 flex items-center font-bold rounded-2xl bg-slate-50 border-none text-slate-600">
+                    {viewProduct.low_stock_bar} Units
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category & Branch</Label>
+                  <div className="h-12 px-4 flex items-center justify-between rounded-2xl bg-slate-50 border-none">
+                    <span className="font-bold text-slate-600">{viewProduct.category_name}</span>
+                    <Badge variant="outline" className="font-black text-[10px] uppercase border-slate-200">{viewProduct.branch_name}</Badge>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3 pb-2.5 pl-2">
+                  <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border-none ${viewProduct.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                    {viewProduct.is_available ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                    <span className="text-sm font-black uppercase">{viewProduct.is_available ? 'Live Selection' : 'Hidden from Menu'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-primary rounded-[2rem] p-6 text-white flex justify-between items-center shadow-xl">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white-500 mb-1">Estimated Profit Margin</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black">{calculateProfit(viewProduct.cost_price, viewProduct.selling_price).margin}%</span>
+                    <span className="text-white-400 font-bold">/ Unit</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <Button
+                    className="h-12 px-6 rounded-2xl font-bold bg-white text-slate-900 hover:bg-slate-100 transition-all shadow-lg"
+                    onClick={() => {
+                      setEditProduct(viewProduct);
+                      setIsViewDialogOpen(false);
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Product
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Search (User Style) */}
+      <div className="card-elevated p-4 border-none shadow-sm bg-white mb-6 rounded-xl">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Search products by name or category..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11 border border-slate-200 bg-white"
+            className="pl-10 h-11 border border-slate-200 bg-white rounded-lg focus-visible:ring-primary"
           />
         </div>
       </div>
 
-      {/* Products Table */}
-      <div className="card-elevated overflow-hidden border-none shadow-sm bg-white">
+      {/* Products Table (User Style merged with backend logic) */}
+      <div className="card-elevated overflow-hidden border-none shadow-sm bg-white rounded-2xl">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -240,19 +398,38 @@ export default function AdminInventory() {
                 {filteredProducts.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                      <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                      <p>No products found</p>
+                      <div className="flex flex-col items-center gap-2">
+                        <Package className="h-12 w-12 opacity-20" />
+                        <p className="font-medium">No products found</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   filteredProducts.map((product) => {
                     const isLow = product.product_quantity <= product.low_stock_bar;
                     const { profit, margin } = calculateProfit(product.cost_price, product.selling_price);
+
                     return (
-                      <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-slate-700">{product.name}</td>
-                        <td className="px-6 py-4 text-slate-500 font-medium uppercase text-[10px] tracking-wider">{product.category_name}</td>
-                        <td className="px-6 py-4 text-slate-500 text-xs">{product.branch_name}</td>
+                      <tr
+                        key={product.id}
+                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                        onClick={() => {
+                          setViewProduct(product);
+                          setIsViewDialogOpen(true);
+                        }}
+                      >
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-slate-700 group-hover:text-primary transition-colors">{product.name}</span>
+                          {!product.is_available && (
+                            <Badge variant="outline" className="ml-2 text-[8px] font-black uppercase text-slate-400 border-slate-200">Hidden</Badge>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 font-medium uppercase text-[10px] tracking-wider">
+                          {product.category_name}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 text-xs">
+                          {product.branch_name}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -263,23 +440,38 @@ export default function AdminInventory() {
                               <span className="text-[10px] text-slate-400 uppercase">Sell:</span>
                               <span className="font-bold text-primary">Rs.{product.selling_price}</span>
                             </div>
-                            <div className="text-[10px] text-green-600 font-bold">
+                            <div className="text-[10px] text-green-600 font-bold flex items-center gap-1">
                               +Rs.{profit.toFixed(2)} ({margin}%)
+                              {parseFloat(margin) > 30 && <TrendingUp className="h-2.5 w-2.5" />}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-slate-700">{product.product_quantity} units</span>
+                        <td className="px-6 py-4 text-xs">
+                          <span className={`font-bold ${isLow ? 'text-red-600' : 'text-slate-700'}`}>
+                            {product.product_quantity} units
+                          </span>
                           <span className="text-[10px] text-slate-400 ml-2">(Min: {product.low_stock_bar})</span>
                         </td>
                         <td className="px-6 py-4">
                           <StatusBadge status={isLow ? 'low' : 'ok'} className="border-none shadow-none font-black text-[10px]" />
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-slate-900"
+                              onClick={() => {
+                                setViewProduct(product);
+                                setIsViewDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-primary"
                               onClick={() => {
                                 setEditProduct(product);
                                 setIsDialogOpen(true);
@@ -290,7 +482,7 @@ export default function AdminInventory() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive hover:text-destructive"
+                              className="h-8 w-8 text-slate-400 hover:text-destructive"
                               onClick={() => handleDelete(product.id)}
                             >
                               <Trash2 className="h-4 w-4" />
