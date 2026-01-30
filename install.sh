@@ -4,7 +4,7 @@ echo "📦 Creating development utilities..."
 echo "====================================="
 
 # Create start.sh
-cat > start.sh << 'EOF'
+cat >start.sh <<'EOF'
 #!/bin/bash
 
 # -------- Simple Start Functions --------
@@ -62,14 +62,14 @@ kill_django() {
 }
 
 kill_node() {
-    echo "🔫 Killing Node on port 5173..."
+    echo "🔫 Killing Node on port 8080..."
     local PID
-    PID="$(lsof -ti tcp:5173 2>/dev/null || true)"
+    PID="$(lsof -ti tcp:8080 2>/dev/null || true)"
     if [ -n "$PID" ]; then
         kill -9 $PID 2>/dev/null || true
         echo "✅ Node killed (PID: $PID)"
     else
-        echo "ℹ️ No Node process found on port 5173"
+        echo "ℹ️ No Node process found on port 8080"
     fi
 }
 
@@ -80,7 +80,7 @@ kill_all() {
 }
 
 killallport() {
-    ports=(3000 5173 8000 8080 5000)
+    ports=(3000 8080 8000 8080 5000)
     for p in "${ports[@]}"; do
         if lsof -ti tcp:$p >/dev/null 2>&1; then
             local PID
@@ -115,7 +115,7 @@ chmod +x start.sh
 echo "✅ Created start.sh"
 
 # Create reset.sh
-cat > reset.sh << 'EOF'
+cat >reset.sh <<'EOF'
 #!/bin/bash
 
 # -------- Kill Functions --------
@@ -132,19 +132,19 @@ kill_django() {
 }
 
 kill_node() {
-    echo "🔫 Killing Node on port 5173..."
+    echo "🔫 Killing Node on port 8080..."
     local PID
-    PID="$(lsof -ti tcp:5173 2>/dev/null || true)"
+    PID="$(lsof -ti tcp:8080 2>/dev/null || true)"
     if [ -n "$PID" ]; then
         kill -9 $PID 2>/dev/null || true
         echo "✅ Node killed (PID: $PID)"
     else
-        echo "ℹ️ No Node process found on port 5173"
+        echo "ℹ️ No Node process found on port 8080"
     fi
 }
 
 killallport() {
-    ports=(3000 5173 8000 8080 5000)
+    ports=(3000 8080 8000 8080 5000)
     for p in "${ports[@]}"; do
         if lsof -ti tcp:$p >/dev/null 2>&1; then
             local PID
@@ -290,12 +290,12 @@ start_node() {
 
     # Start frontend
     echo "⚡ Starting Vite..."
-    nohup npm run dev -- --host 0.0.0.0 --port 5173 > /tmp/node.log 2>&1 &
+    nohup npm run dev -- --host 0.0.0.0 --port 8080 > /tmp/node.log 2>&1 &
     local NODE_PID=$!
     
     sleep 3
     if ps -p $NODE_PID > /dev/null 2>&1; then
-        echo "✅ Frontend running: http://localhost:5173"
+        echo "✅ Frontend running: http://localhost:8080"
         echo "   Logs: /tmp/node.log"
         
         # Show Vite URLs after a moment
@@ -394,7 +394,7 @@ reset_pydjno() {
     echo "🌐 URLs:"
     [ -n "$MYSITE_DIR" ] && echo "   Django: http://127.0.0.1:8000"
     [ -n "$MYSITE_DIR" ] && echo "   Admin:  http://127.0.0.1:8000/admin (su/su)"
-    [ -n "$FRONTEND_DIR" ] && echo "   Frontend: http://localhost:5173"
+    [ -n "$FRONTEND_DIR" ] && echo "   Frontend: http://localhost:8080"
     echo
 }
 

@@ -62,7 +62,7 @@ class Product(models.Model):
     product_quantity = models.IntegerField(default=0)
     category = models.ForeignKey(
         ProductCategory,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="products",
     )
     low_stock_bar = models.IntegerField(default=0)
