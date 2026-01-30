@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.views import APIView, Response
 
-from ..models import Branch, ProductCategory, User
+from ..models import Branch, User
 from ..serializer_dir.branch_serializer import BranchSerializers
 
 
@@ -12,8 +12,8 @@ class BranchViewClass(APIView):
     # --- GET (List or Retrieve) ---
     def get(self, request, id=None):
         role = self.get_user_role(request.user)
+        my_branch = request.user.branch
 
-        # Permission check - who can view branches?
         if role not in ["SUPER_ADMIN", "ADMIN", "BRANCH_MANAGER"]:
             return Response(
                 {"success": False, "message": "Permission denied."},
@@ -21,22 +21,61 @@ class BranchViewClass(APIView):
             )
 
         if id:
-            # Get single branch
+            # Single branch with prefetch
             try:
-                branch = Branch.objects.get(id=id)
+                branch = Branch.objects.prefetch_related(
+                    "branch_user"  # Assuming User has foreign key to Branch
+                ).get(id=id)
+
                 serializer = BranchSerializers(branch)
-                return Response({"success": True, "data": serializer.data})
+                response_data = dict(serializer.data)
+
+                # Get manager from prefetched users
+                manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
+
+                if manager:
+                    response_data["branch_manager"] = {
+                        "id": manager.id,
+                        "username": manager.username,
+                        "total_user": branch.branch_user.count(),
+                    }
+                else:
+                    response_data["branch_manager"] = None
+
+                return Response({"success": True, "data": response_data})
+
             except Branch.DoesNotExist:
                 return Response(
                     {"success": False, "message": "Branch not found."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
         else:
-            # Get all branches
-            branches = Branch.objects.all()
-            serializer = BranchSerializers(branches, many=True)
+            # All branches with prefetch (most efficient)
+            branches = Branch.objects.prefetch_related("branch_user").all()
+
+            response_data = []
+            for branch in branches:
+                # Serialize each branch
+                branch_data = BranchSerializers(branch).data
+                branch_dict = dict(branch_data)
+
+                # Get manager from prefetched users
+                manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
+
+                if manager:
+                    branch_dict["branch_manager"] = {
+                        "id": manager.id,
+                        "username": manager.username,
+                        "email": manager.email,
+                        "total_user": branch.branch_user.count(),
+                    }
+                else:
+                    branch_dict["branch_manager"] = None
+
+                response_data.append(branch_dict)
+
             return Response(
-                {"success": True, "count": branches.count(), "data": serializer.data}
+                {"success": True, "count": len(response_data), "data": response_data}
             )
 
     # --- POST (Create) ---
