@@ -11,6 +11,6 @@ urlpatterns = [
     path(
         "category/<int:id>/", views.CategoryViewClass.as_view(), name="Category_details"
     ),
+    path("branch/<int:id>/", views.BranchViewClass.as_view(), name="Branch_details"),
     path("branch/", views.BranchViewClass.as_view(), name="Branch"),
-    path("branch/<int:id>", views.BranchViewClass.as_view(), name="Branch"),
 ]

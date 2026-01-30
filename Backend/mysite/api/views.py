@@ -14,17 +14,6 @@ from .views_dir.users_view import UserViewClass
 from .views_dir.categorys_view import CategoryViewClass
 from .views_dir.branch_view import BranchViewClass
 
-
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-
-UserView = UserViewClass
-ProductView = ProductViewClass
-CategoryView = CategoryViewClass
-BranchView = BranchViewClass
-
-
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def change_own_password(request):
@@ -43,3 +32,12 @@ def change_own_password(request):
         {"success": False, "errors": serializer.errors},
         status=status.HTTP_400_BAD_REQUEST,
     )
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+UserView = UserViewClass
+ProductView = ProductViewClass
+CategoryView = CategoryViewClass
+BranchView = BranchViewClass
