@@ -47,6 +47,7 @@ interface UserData {
     full_name: string;
     user_type: string;
     email: string;
+    phone?: string;
     branch_name?: string;
     branch?: number;
 }
@@ -64,6 +65,7 @@ export default function SuperAdminAccess() {
         full_name: "",
         username: "",
         email: "",
+        phone: "",
         password: "",
         user_type: "BRANCH_MANAGER",
         branch: ""
@@ -95,6 +97,7 @@ export default function SuperAdminAccess() {
             full_name: "",
             username: "",
             email: "",
+            phone: "",
             password: "",
             user_type: "BRANCH_MANAGER",
             branch: ""
@@ -108,6 +111,7 @@ export default function SuperAdminAccess() {
             full_name: user.full_name || "",
             username: user.username || "",
             email: user.email || "",
+            phone: user.phone || "",
             password: "",
             user_type: user.user_type,
             branch: user.branch?.toString() || ""
@@ -119,15 +123,24 @@ export default function SuperAdminAccess() {
         e.preventDefault();
         setSubmitting(true);
 
-        const payload = {
-            ...form,
+        const payload: any = {
+            full_name: form.full_name,
+            username: form.username,
+            email: form.email,
+            phone: form.phone,
+            user_type: form.user_type,
             branch: form.branch ? parseInt(form.branch) : null
         };
 
+        // If it's a new user and no password provided, use the default
+        if (!editUser && !form.password) {
+            payload.password = "amabakery@123";
+        } else if (form.password) {
+            payload.password = form.password;
+        }
+
         try {
             if (editUser) {
-                // Remove password if empty on edit
-                if (!payload.password) delete (payload as any).password;
                 await updateUser(editUser.id, payload);
                 toast.success("Manager updated successfully");
             } else {
@@ -199,7 +212,7 @@ export default function SuperAdminAccess() {
                                     <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Administrator</th>
                                     <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Role</th>
                                     <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Assigned Branch</th>
-                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Username</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Contact Info</th>
                                     <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">Actions</th>
                                 </tr>
                             </thead>
@@ -232,9 +245,10 @@ export default function SuperAdminAccess() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-5">
-                                            <span className="font-mono text-xs text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                                                {user.username}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-mono text-xs text-slate-500">@{user.username}</span>
+                                                <span className="text-xs text-slate-400 font-bold">{user.phone || "---"}</span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -301,18 +315,29 @@ export default function SuperAdminAccess() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</Label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                    <Input
-                                        type="email"
-                                        value={form.email}
-                                        onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                                        placeholder="raj@ama.com"
-                                        className="pl-10 h-12 rounded-xl border-slate-200"
-                                        required
-                                    />
-                                </div>
+                                <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Phone</Label>
+                                <Input
+                                    value={form.phone}
+                                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                                    placeholder="98XXXXXXXX"
+                                    className="h-12 rounded-xl border-slate-200"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email</Label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <Input
+                                    type="email"
+                                    value={form.email}
+                                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                                    placeholder="raj@ama.com"
+                                    className="pl-10 h-12 rounded-xl border-slate-200"
+                                    required
+                                />
                             </div>
                         </div>
 
