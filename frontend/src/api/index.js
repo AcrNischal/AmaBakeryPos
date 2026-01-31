@@ -302,6 +302,7 @@ export async function deleteCategory(id) {
   if (!res.ok) throw new Error(data?.message || "Failed to delete category");
   return data;
 }
+
 // Branch Management APIs (SuperAdmin)
 export async function fetchBranches() {
   const token = localStorage.getItem("access");
