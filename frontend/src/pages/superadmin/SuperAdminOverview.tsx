@@ -29,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { fetchBranches, createBranch } from "../../api/index.js";
+import { fetchBranches, createBranch, createUser } from "../../api/index.js";
 import { users as mockUsers } from "@/lib/mockData";
 
 interface Branch {
@@ -53,7 +53,17 @@ export default function SuperAdminOverview() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [form, setForm] = useState({ name: "", location: "" });
+
+    // Enhanced Form State
+    const [form, setForm] = useState({
+        name: "",
+        location: "",
+        showManager: false, // Control manager section visibility
+        manager_username: "",
+        manager_full_name: "",
+        manager_email: "",
+        manager_phone: "",
+    });
 
     useEffect(() => {
         loadData();
@@ -62,8 +72,8 @@ export default function SuperAdminOverview() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const response = await fetchBranches();
-            setBranches(response.data || []);
+            const branchRes = await fetchBranches();
+            setBranches(branchRes.data || []);
         } catch (err: any) {
             toast.error(err.message || "Failed to load dashboard data");
         } finally {
@@ -73,19 +83,56 @@ export default function SuperAdminOverview() {
 
     const handleCreateBranch = async () => {
         if (!form.name || !form.location) {
-            toast.error("Please fill all fields");
+            toast.error("Please fill Name and Location");
             return;
+        }
+
+        if (form.showManager) {
+            if (!form.manager_username || !form.manager_full_name || !form.manager_email) {
+                toast.error("Please provide Username, Full Name and Email for the new manager");
+                return;
+            }
         }
 
         setIsSubmitting(true);
         try {
-            const response = await createBranch(form);
-            toast.success(response.message || "Branch created successfully");
+            // 1. Create Branch
+            const branchRes = await createBranch({
+                name: form.name,
+                location: form.location
+            });
+
+            const newBranchId = branchRes.data.id;
+
+            // 2. Handle New Manager (Only if opted-in)
+            if (form.showManager) {
+                await createUser({
+                    username: form.manager_username,
+                    full_name: form.manager_full_name,
+                    email: form.manager_email,
+                    phone: form.manager_phone,
+                    user_type: "BRANCH_MANAGER",
+                    branch: newBranchId,
+                    password: "amabakery@123"
+                });
+                toast.success(`Branch created and new manager ${form.manager_username} registered`);
+            } else {
+                toast.success("Branch created successfully (Stand-alone)");
+            }
+
             setIsAddOpen(false);
-            setForm({ name: "", location: "" });
+            setForm({
+                name: "",
+                location: "",
+                showManager: false,
+                manager_username: "",
+                manager_full_name: "",
+                manager_email: "",
+                manager_phone: "",
+            });
             loadData();
         } catch (err: any) {
-            toast.error(err.message || "Failed to create branch");
+            toast.error(err.message || "Failed to finalize branch setup");
         } finally {
             setIsSubmitting(false);
         }
@@ -324,36 +371,116 @@ export default function SuperAdminOverview() {
 
             {/* Creation Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogContent className="sm:max-w-[425px] rounded-[2rem]">
+                <DialogContent className="sm:max-w-[500px] rounded-[2rem] overflow-hidden">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black text-slate-900">Add New Branch</DialogTitle>
                         <DialogDescription className="font-medium">
-                            Create a new branch location in the system.
+                            Create a new branch location and assign or create a manager.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name" className="text-sm font-bold uppercase tracking-wider text-slate-500 ml-1">Branch Name</Label>
-                            <Input
-                                id="name"
-                                value={form.name}
-                                onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                                placeholder="Ama Bakery - Kathmandu"
-                                className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm"
-                            />
+                    <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto px-1">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Branch Name</Label>
+                                <Input
+                                    id="name"
+                                    value={form.name}
+                                    onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Ama Bakery - KTM"
+                                    className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm font-bold"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="location" className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Location</Label>
+                                <Input
+                                    id="location"
+                                    value={form.location}
+                                    onChange={(e) => setForm(prev => ({ ...prev, location: e.target.value }))}
+                                    placeholder="Baneshwor"
+                                    className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm font-bold"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="location" className="text-sm font-bold uppercase tracking-wider text-slate-500 ml-1">Location Address</Label>
-                            <Input
-                                id="location"
-                                value={form.location}
-                                onChange={(e) => setForm(prev => ({ ...prev, location: e.target.value }))}
-                                placeholder="Baneshwor, Kathmandu"
-                                className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm"
-                            />
+
+                        <div className="pt-2 border-t border-slate-100 mt-2">
+                            {!form.showManager ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setForm(p => ({ ...p, showManager: true }))}
+                                    className="w-full h-12 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:text-primary hover:border-primary transition-all font-bold gap-2"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add New Manager Account
+                                </Button>
+                            ) : (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-primary ml-1">New Manager Details</Label>
+                                            <p className="text-[9px] text-slate-400 font-medium ml-1">Registration for this branch only</p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setForm(p => ({ ...p, showManager: false, manager_username: "", manager_full_name: "", manager_email: "", manager_phone: "" }))}
+                                            className="h-7 text-[9px] font-black uppercase tracking-tighter text-red-400 hover:text-red-500 hover:bg-red-50"
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
+
+                                    <div className="space-y-4 p-4 rounded-2xl bg-primary/5 border-2 border-primary/10 animate-in fade-in zoom-in-95 duration-300">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60 ml-1">Username</Label>
+                                                <Input
+                                                    value={form.manager_username}
+                                                    onChange={(e) => setForm(prev => ({ ...prev, manager_username: e.target.value }))}
+                                                    placeholder="rajdeep_mgr"
+                                                    className="h-12 rounded-xl border-primary/10 bg-white font-bold"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60 ml-1">Full Name</Label>
+                                                <Input
+                                                    value={form.manager_full_name}
+                                                    onChange={(e) => setForm(prev => ({ ...prev, manager_full_name: e.target.value }))}
+                                                    placeholder="Rajdeep Sharma"
+                                                    className="h-12 rounded-xl border-primary/10 bg-white font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60 ml-1">Email</Label>
+                                                <Input
+                                                    value={form.manager_email}
+                                                    onChange={(e) => setForm(prev => ({ ...prev, manager_email: e.target.value }))}
+                                                    placeholder="manager@ama.com"
+                                                    className="h-12 rounded-xl border-primary/10 bg-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60 ml-1">Phone</Label>
+                                                <Input
+                                                    value={form.manager_phone}
+                                                    onChange={(e) => setForm(prev => ({ ...prev, manager_phone: e.target.value }))}
+                                                    placeholder="98XXXXXXXX"
+                                                    className="h-12 rounded-xl border-primary/10 bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight text-center">
+                                            Default Password: <span className="text-primary">amabakery@123</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="bg-slate-50/50 p-6">
                         <Button
                             variant="ghost"
                             onClick={() => setIsAddOpen(false)}
@@ -366,7 +493,7 @@ export default function SuperAdminOverview() {
                             disabled={isSubmitting}
                             className="h-12 px-8 rounded-xl gradient-warm text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-200"
                         >
-                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : "Create Branch"}
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : "Create & Provision"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
