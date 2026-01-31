@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -20,21 +20,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Plus,
   Search,
-  AlertTriangle,
-  Package,
   Loader2,
   Pencil,
   Trash2,
-  Eye,
-  Info,
-  CheckCircle2,
-  XCircle,
-  Store,
-  Calendar,
-  Tag,
-  TrendingUp
+  ArrowUpDown,
+  Filter,
+  Package,
+  TrendingUp,
+  History,
+  ChevronDown,
+  Minus
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories } from "../../api/index.js";
@@ -61,16 +64,33 @@ interface BackendCategory {
   branch_name: string;
 }
 
+interface ActivityLog {
+  id: number;
+  type: "Add Stock" | "Remove Stock" | "Update" | "Initial";
+  date: string;
+  change: string;
+  quantity: number;
+  remarks: string;
+}
+
 export default function AdminInventory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<BackendCategory[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Selection State
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+
+  // Dialog States
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isAdjustStockOpen, setIsAdjustStockOpen] = useState(false);
+  const [stockActionType, setStockActionType] = useState<"add" | "remove">("add");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
-  const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Mock Activity Log (In a real app, this would come from the backend)
+  const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>({});
 
   useEffect(() => {
     loadData();
@@ -85,6 +105,11 @@ export default function AdminInventory() {
       ]);
       setProducts(productsData);
       setCategories(categoriesData);
+
+      // Select first product by default if available and none selected
+      if (productsData.length > 0 && !selectedProductId) {
+        setSelectedProductId(productsData[0].id);
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to load data");
     } finally {
@@ -92,19 +117,18 @@ export default function AdminInventory() {
     }
   };
 
-  const lowStockItems = products.filter(product => product.product_quantity <= product.low_stock_bar);
-
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const selectedProduct = products.find(p => p.id === selectedProductId);
+
+  // Handle Product Create/Update
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
-
-    // Get switch value manually
     const is_available = e.currentTarget.querySelector<HTMLButtonElement>('[role="switch"]')?.['aria-checked' as any] === 'true';
 
     const payload = {
@@ -122,15 +146,21 @@ export default function AdminInventory() {
         const updated = await updateProduct(editProduct.id, payload);
         setProducts(prev => prev.map(p => p.id === editProduct.id ? updated : p));
         toast.success("Product updated");
+
+        // Log Update Activity
+        addActivity(editProduct.id, "Update", "0", payload.product_quantity, "Product details updated");
       } else {
         const newProduct = await createProduct(payload);
         setProducts(prev => [...prev, newProduct]);
         toast.success("Product added");
+        setSelectedProductId(newProduct.id); // Select new product
+
+        // Init Activity
+        addActivity(newProduct.id, "Initial", `+${newProduct.product_quantity}`, newProduct.product_quantity, "Opening Stock");
       }
       setIsDialogOpen(false);
       setEditProduct(null);
     } catch (err: any) {
-      console.error("Product operation error:", err);
       toast.error(err.message || "Operation failed");
     } finally {
       setSubmitting(false);
@@ -139,342 +169,398 @@ export default function AdminInventory() {
 
   const handleDelete = async (productId: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
-
     try {
       const data = await deleteProduct(productId);
       setProducts(prev => prev.filter(p => p.id !== productId));
+
+      // If deleted product was selected, select another
+      if (selectedProductId === productId) {
+        const remaining = products.filter(p => p.id !== productId);
+        setSelectedProductId(remaining.length > 0 ? remaining[0].id : null);
+      }
       toast.success(data.message || "Product deleted");
     } catch (err: any) {
       toast.error(err.message || "Delete failed");
     }
   };
 
-  const calculateProfit = (costPrice: string, sellingPrice: string) => {
-    const cost = parseFloat(costPrice);
-    const selling = parseFloat(sellingPrice);
-    const profit = selling - cost;
-    const margin = selling > 0 ? ((profit / selling) * 100).toFixed(1) : "0.0";
-    return { profit, margin };
+  // Stock Adjustment Handler
+  const handleAdjustStock = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedProduct) return;
+
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const type = formData.get("type") as "add" | "remove";
+    const quantity = parseInt(formData.get("quantity") as string);
+    const remarks = formData.get("remarks") as string;
+
+    if (!quantity || quantity <= 0) {
+      toast.error("Please enter a valid quantity");
+      setSubmitting(false);
+      return;
+    }
+
+    const newQuantity = type === "add"
+      ? selectedProduct.product_quantity + quantity
+      : selectedProduct.product_quantity - quantity;
+
+    if (newQuantity < 0) {
+      toast.error("Insufficient stock!");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      // Create a proper payload that includes all required fields
+      // Since the generic update API might require all fields, we construct the full object
+      const payload = {
+        name: selectedProduct.name,
+        cost_price: selectedProduct.cost_price,
+        selling_price: selectedProduct.selling_price,
+        product_quantity: newQuantity,
+        low_stock_bar: selectedProduct.low_stock_bar,
+        category: selectedProduct.category,
+        is_available: selectedProduct.is_available
+      };
+
+      const updated = await updateProduct(selectedProduct.id, payload);
+      setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updated : p));
+
+      // Log Activity
+      addActivity(
+        selectedProduct.id,
+        type === "add" ? "Add Stock" : "Remove Stock",
+        type === "add" ? `+${quantity}` : `-${quantity}`,
+        newQuantity,
+        remarks || "Manual Adjustment"
+      );
+
+      toast.success("Stock adjusted successfully");
+      setIsAdjustStockOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Stock adjustment failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  const addActivity = (productId: number, type: any, change: string, quantity: number, remarks: string) => {
+    setActivityLogs(prev => {
+      const logs = prev[productId] || [];
+      const newLog: ActivityLog = {
+        id: Date.now(),
+        type,
+        date: new Date().toISOString().split('T')[0],
+        change,
+        quantity,
+        remarks
+      };
+      return { ...prev, [productId]: [newLog, ...logs] };
+    });
+  };
+
+  const currentActivity = selectedProductId ? (activityLogs[selectedProductId] || []) : [];
+
+  const stockValue = selectedProduct
+    ? (selectedProduct.product_quantity * parseFloat(selectedProduct.cost_price)).toFixed(2)
+    : "0.00";
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory</h1>
-          <p className="text-muted-foreground">Track and manage product stock levels</p>
+    <div className="flex h-[calc(100vh-100px)] gap-6 p-6 overflow-hidden">
+
+      {/* Left Sidebar: Product List */}
+      <div className="w-1/4 min-w-[300px] flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-800">Products({filteredProducts.length})</h2>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditProduct(null)} size="sm" className="bg-primary text-white hover:bg-primary/90 rounded-lg text-xs font-bold">
+                <Plus className="h-3 w-3 mr-1" /> Add Product
+              </Button>
+            </DialogTrigger>
+            {/* Product Form Logic reused here */}
+            <DialogContent className="max-w-2xl rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">
+                  {editProduct ? 'Edit Product' : 'Add New Product'}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                {/* Same Form Fields as before */}
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
+                  <Input id="name" name="name" className="h-12 text-lg rounded-2xl bg-slate-50 border border-slate-200" placeholder="Enter product name" defaultValue={editProduct?.name} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cost_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
+                    <Input id="cost_price" name="cost_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200" type="number" step="0.01" defaultValue={editProduct?.cost_price} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="selling_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                    <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary" type="number" step="0.01" defaultValue={editProduct?.selling_price} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="product_quantity" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
+                    <Input id="product_quantity" name="product_quantity" className="h-12 rounded-2xl bg-slate-50 border border-slate-200" type="number" defaultValue={editProduct?.product_quantity} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="low_stock_bar" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
+                    <Input id="low_stock_bar" name="low_stock_bar" className="h-12 rounded-2xl bg-slate-50 border border-slate-200" type="number" defaultValue={editProduct?.low_stock_bar} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
+                    <Select name="category" defaultValue={editProduct?.category?.toString()}>
+                      <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border border-slate-200">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl">
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id.toString()} className="rounded-xl my-1">{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-3 pb-2.5 pl-2">
+                    <Switch id="is_available" defaultChecked={editProduct?.is_available ?? true} />
+                    <Label htmlFor="is_available" className="text-sm font-bold text-slate-600">Available for Sale</Label>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-6">
+                  <Button type="button" variant="outline" className="flex-1 h-12 rounded-2xl font-bold" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="flex-1 h-12 rounded-2xl font-bold" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editProduct ? 'Update Product' : 'Add Product')}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditProduct(null)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl rounded-3xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase tracking-tight">
-                {editProduct ? 'Edit Product' : 'Add New Product'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
-                <Input id="name" name="name" className="h-12 text-lg rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" placeholder="Enter product name" defaultValue={editProduct?.name} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cost_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
-                  <Input id="cost_price" name="cost_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.cost_price} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="selling_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
-                  <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 font-bold text-primary" type="number" step="0.01" placeholder="0.00" defaultValue={editProduct?.selling_price} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="product_quantity" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
-                  <Input id="product_quantity" name="product_quantity" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editProduct?.product_quantity} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="low_stock_bar" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
-                  <Input id="low_stock_bar" name="low_stock_bar" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editProduct?.low_stock_bar} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
-                  <Select name="category" defaultValue={editProduct?.category?.toString()}>
-                    <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-none shadow-2xl">
-                      {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id.toString()} className="rounded-xl my-1">{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center space-x-3 pb-2.5 pl-2">
-                  <Switch id="is_available" defaultChecked={editProduct?.is_available ?? true} />
-                  <Label htmlFor="is_available" className="text-sm font-bold text-slate-600">Available for Sale</Label>
-                </div>
-              </div>
-              <div className="flex gap-3 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 h-12 rounded-2xl font-bold"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setEditProduct(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20" disabled={submitting}>
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {editProduct ? 'Updating...' : 'Adding...'}
-                    </>
-                  ) : (
-                    editProduct ? 'Update Product' : 'Add Product'
-                  )}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Low Stock Alert Banner (User Style) */}
-      {lowStockItems.length > 0 && (
-        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 transition-all animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-3 mb-3">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <h3 className="font-semibold text-destructive">Low Stock Alert ({lowStockItems.length})</h3>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {lowStockItems.map(product => (
-              <span
-                key={product.id}
-                className="bg-destructive/20 text-destructive px-3 py-1 rounded-full text-sm font-medium border border-destructive/20"
-              >
-                {product.name}: {product.product_quantity} units
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* View Details Dialog (Mirrors Edit style) */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl overflow-hidden">
-          <DialogHeader className="pb-4 border-b">
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
-              <Info className="h-6 w-6 text-primary" />
-              Product Details
-            </DialogTitle>
-          </DialogHeader>
-          {viewProduct && (
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
-                <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border border-slate-200 text-slate-900">
-                  {viewProduct.name}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
-                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
-                    {viewProduct.cost_price}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
-                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary">
-                    {viewProduct.selling_price}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
-                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold">
-                    {viewProduct.product_quantity}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
-                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
-                    {viewProduct.low_stock_bar}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
-                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 font-bold">
-                    {viewProduct.category_name}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3 pb-2.5 pl-2">
-                  <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border border-slate-200 ${viewProduct.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                    {viewProduct.is_available ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                    <span className="text-sm font-black uppercase">{viewProduct.is_available ? 'Available for Sale' : 'Hidden from Menu'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-6">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-12 rounded-2xl font-bold"
-                  onClick={() => setIsViewDialogOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  className="flex-1 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20"
-                  onClick={() => {
-                    setEditProduct(viewProduct);
-                    setIsViewDialogOpen(false);
-                    setIsDialogOpen(true);
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit Product
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Search (User Style) */}
-      <div className="card-elevated p-4 border-none shadow-sm bg-white mb-6 rounded-xl">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search products by name or category..."
+            placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11 border border-slate-200 bg-white rounded-lg focus-visible:ring-primary"
+            className="pl-10 h-10 bg-slate-100 border-none rounded-xl"
           />
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg h-8 text-xs font-bold bg-slate-50 border-slate-200">
+            <ArrowUpDown className="h-3 w-3 mr-1" /> Sort By
+          </Button>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <Badge variant="secondary" className="rounded-lg px-3 py-1 bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer">All Category</Badge>
+          <Badge variant="outline" className="rounded-lg px-3 py-1 border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer">All Stock</Badge>
+          <Badge variant="outline" className="rounded-lg px-3 py-1 border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer">All Items</Badge>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+          {loading ? (
+            <div className="text-center py-10 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No products found</div>
+          ) : (
+            filteredProducts.map(product => (
+              <div
+                key={product.id}
+                onClick={() => setSelectedProductId(product.id)}
+                className={`p-3 rounded-xl cursor-pointer transition-all ${selectedProductId === product.id ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-white hover:bg-slate-50 border-transparent'} border`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className={`font-bold text-sm ${selectedProductId === product.id ? 'text-primary' : 'text-slate-700'}`}>{product.name}</h3>
+                  {product.product_quantity <= product.low_stock_bar && (
+                    <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Low</Badge>
+                  )}
+                </div>
+                <p className={`text-xs ${selectedProductId === product.id ? 'text-primary' : 'text-slate-400'}`}>{product.product_quantity} units</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Products Table (User Style merged with backend logic) */}
-      <div className="card-elevated overflow-hidden border-none shadow-sm bg-white rounded-2xl">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Product</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Category</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Price (Rs.)</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Stock</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Status</th>
-                  <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                      <div className="flex flex-col items-center gap-2">
-                        <Package className="h-12 w-12 opacity-20" />
-                        <p className="font-medium">No products found</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProducts.map((product) => {
-                    const isLow = product.product_quantity <= product.low_stock_bar;
-                    const { profit, margin } = calculateProfit(product.cost_price, product.selling_price);
+      {/* Right Details Pane */}
+      <div className="flex-1 bg-slate-50 rounded-[2rem] p-8 overflow-y-auto w-3/4">
+        {selectedProduct ? (
+          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+            {/* Header Row */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-black text-slate-900">{selectedProduct.name}</h1>
+              <div className="flex gap-2">
+                <Button
+                  className="bg-primary hover:bg-primary/90 text-white rounded-xl h-10 px-4 font-bold text-xs shadow-lg shadow-primary/20"
+                  onClick={() => {
+                    setEditProduct(selectedProduct);
+                    setIsDialogOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3 w-3 mr-2" /> Edit Item
+                </Button>
+                <Button
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-xl h-10 px-4 font-bold text-xs"
+                  onClick={() => handleDelete(selectedProduct.id)}
+                >
+                  <Trash2 className="h-3 w-3 mr-2" /> Delete Item
+                </Button>
+              </div>
+            </div>
 
-                    return (
-                      <tr
-                        key={product.id}
-                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+            {/* Stats Row */}
+            <div className="grid grid-cols-4 gap-8 py-6 border-b border-slate-200">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Stock Quantity</p>
+                <p className="text-2xl font-black text-slate-900">{selectedProduct.product_quantity}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Selling Price</p>
+                <p className="text-2xl font-black text-slate-900">Rs.{selectedProduct.selling_price}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Purchase Price</p>
+                <p className="text-2xl font-black text-slate-900">Rs.{selectedProduct.cost_price}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Stock Value</p>
+                <p className="text-2xl font-black text-slate-900">Rs.{stockValue}</p>
+              </div>
+            </div>
+
+            {/* Activity Section */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-800">Activity({currentActivity.length})</h2>
+                <div className="flex gap-2">
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                    <Input className="h-9 pl-9 bg-white border-slate-200 rounded-lg text-xs" placeholder="Search activity..." />
+                  </div>
+                  <Button variant="outline" size="sm" className="h-9 rounded-lg text-xs font-bold bg-white border-slate-200">
+                    <ArrowUpDown className="h-3 w-3 mr-1" /> Sort By
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" className="h-9 rounded-lg text-xs font-bold bg-primary hover:bg-primary/90 text-white gap-2 shadow-lg shadow-primary/20">
+                        Adjust Stock <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-xl">
+                      <DropdownMenuItem
                         onClick={() => {
-                          setViewProduct(product);
-                          setIsViewDialogOpen(true);
+                          setStockActionType("add");
+                          setIsAdjustStockOpen(true);
                         }}
+                        className="font-bold text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer"
                       >
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-slate-700 group-hover:text-primary transition-colors">{product.name}</span>
-                          {!product.is_available && (
-                            <Badge variant="outline" className="ml-2 text-[8px] font-black uppercase text-slate-400 border-slate-200">Hidden</Badge>
+                        <Plus className="h-3 w-3 mr-2" /> Add Stock
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setStockActionType("remove");
+                          setIsAdjustStockOpen(true);
+                        }}
+                        className="font-bold text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
+                      >
+                        <Minus className="h-3 w-3 mr-2" /> Remove Stock
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <Dialog open={isAdjustStockOpen} onOpenChange={setIsAdjustStockOpen}>
+                    <DialogContent className="max-w-md rounded-3xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-black flex items-center gap-2">
+                          {stockActionType === "add" ? (
+                            <div className="flex items-center text-emerald-600 gap-2">
+                              <div className="p-2 bg-emerald-100 rounded-lg"><Plus className="h-5 w-5" /></div>
+                              Add Stock
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-red-600 gap-2">
+                              <div className="p-2 bg-red-100 rounded-lg"><Minus className="h-5 w-5" /></div>
+                              Remove Stock
+                            </div>
                           )}
-                        </td>
-                        <td className="px-6 py-4 text-slate-500 font-medium uppercase text-[10px] tracking-wider">
-                          {product.category_name}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-primary">Rs.{product.selling_price}</span>
-                        </td>
-                        <td className="px-6 py-4 text-xs">
-                          <span className={`font-bold ${isLow ? 'text-red-600' : 'text-slate-700'}`}>
-                            {product.product_quantity} units
-                          </span>
-                          <span className="text-[10px] text-slate-400 ml-2">(Min: {product.low_stock_bar})</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <StatusBadge status={isLow ? 'low' : 'ok'} className="border-none shadow-none font-black text-[10px]" />
-                        </td>
-                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-400 hover:text-slate-900"
-                              onClick={() => {
-                                setViewProduct(product);
-                                setIsViewDialogOpen(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-400 hover:text-primary"
-                              onClick={() => {
-                                setEditProduct(product);
-                                setIsDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-400 hover:text-destructive"
-                              onClick={() => handleDelete(product.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleAdjustStock} className="space-y-4 pt-4">
+                        <input type="hidden" name="type" value={stockActionType} />
+
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Current Stock</p>
+                          <p className="text-xl font-black text-slate-900">{selectedProduct?.product_quantity} units</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-slate-400">
+                            Quantity to {stockActionType === "add" ? "Add" : "Remove"}
+                          </Label>
+                          <Input name="quantity" type="number" min="1" className="h-12 rounded-xl bg-slate-50 border-slate-200 text-lg font-bold" placeholder="0" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-slate-400">Remarks</Label>
+                          <Input name="remarks" className="h-12 rounded-xl bg-slate-50 border-slate-200" placeholder="Reason for adjustment..." />
+                        </div>
+                        <Button
+                          type="submit"
+                          className={`w-full h-12 rounded-xl font-bold mt-2 ${stockActionType === 'add' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                          disabled={submitting}
+                        >
+                          {submitting ? <Loader2 className="animate-spin" /> : (stockActionType === 'add' ? "Confirm Addition" : "Confirm Removal")}
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Change</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentActivity.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">
+                          No activity logs found for this session.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      currentActivity.map(log => (
+                        <tr key={log.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-4 text-sm font-bold text-slate-700">{log.type}</td>
+                          <td className="px-6 py-4 text-sm text-slate-500 font-medium">{log.date}</td>
+                          <td className={`px-6 py-4 text-sm font-bold ${log.change.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>{log.change}</td>
+                          <td className="px-6 py-4 text-sm text-slate-700 font-bold">{log.quantity}</td>
+                          <td className="px-6 py-4 text-sm text-slate-500">{log.remarks}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-slate-300">
+            <Package className="h-16 w-16 mb-4 opacity-20" />
+            <p className="font-bold text-lg">Select a product to view details</p>
           </div>
         )}
       </div>
