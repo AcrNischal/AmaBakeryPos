@@ -1,6 +1,6 @@
 import uuid
-
 from decimal import Decimal
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
@@ -160,6 +160,7 @@ class Invoice(models.Model):
         """Calculate due amount dynamically"""
         return Decimal(str(self.total_amount)) - Decimal(str(self.paid_amount))
 
+
 class InvoiceItem(models.Model):
     ITEM_TYPE_CHOICES = [
         ("PRODUCT", "Product"),
@@ -194,7 +195,6 @@ class InvoiceItem(models.Model):
 
     @property
     def line_total(self):
-
         try:
             total = Decimal(str(self.quantity)) * Decimal(str(self.unit_price))
             total -= Decimal(str(self.discount_amount))
@@ -202,22 +202,27 @@ class InvoiceItem(models.Model):
         except:
             return Decimal("0")
 
+
 # models.py
 class Payment(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ("CASH", "Cash"),
         ("CARD", "Card"),
-        ("UPI", "UPI"),
-        ("CHEQUE", "Cheque"),
     ]
-    
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="payments")
+
+    invoice = models.ForeignKey(
+        Invoice, on_delete=models.CASCADE, related_name="payments"
+    )
     amount = models.DecimalField(max_digits=15, decimal_places=2)
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default="CASH")
+    payment_method = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, default="CASH"
+    )
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
     payment_date = models.DateTimeField(default=timezone.now)
-    received_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="received_payments")
-    
+    received_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="received_payments"
+    )
+
     def __str__(self):
         return f"Payment {self.amount} - {self.invoice.invoice_number}"

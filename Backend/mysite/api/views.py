@@ -11,6 +11,7 @@ from .views_dir.branch_view import BranchViewClass
 from .views_dir.categorys_view import CategoryViewClass
 from .views_dir.customer_view import CustomerViewClass
 from .views_dir.invoice_view import InvoiceViewClass
+from .views_dir.payment_view import PaymentClassView
 
 # custom
 from .views_dir.product_view import ProductViewClass
@@ -47,3 +48,4 @@ CategoryView = CategoryViewClass
 BranchView = BranchViewClass
 CustomerView = CustomerViewClass
 InvoiceView = InvoiceViewClass
+PaymentView = PaymentClassView
