@@ -10,7 +10,7 @@ from .serializer_dir.users_serializer import (
 from .views_dir.branch_view import BranchViewClass
 from .views_dir.categorys_view import CategoryViewClass
 from .views_dir.customer_view import CustomerViewClass
-from .views_dir.order_view import OrderViewClass
+from .views_dir.invoice_view import InvoiceViewClass
 
 # custom
 from .views_dir.product_view import ProductViewClass
@@ -40,9 +40,10 @@ def change_own_password(request):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
+
 UserView = UserViewClass
 ProductView = ProductViewClass
 CategoryView = CategoryViewClass
 BranchView = BranchViewClass
 CustomerView = CustomerViewClass
-OrderfView = OrderViewClass
+InvoiceView = InvoiceViewClass

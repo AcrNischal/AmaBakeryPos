@@ -15,6 +15,6 @@ urlpatterns = [
     path("branch/", views.BranchViewClass.as_view(), name="Branch"),
     path("customer/<int:id>/", views.CustomerView.as_view(), name="customer_details"),
     path("customer/", views.CustomerView.as_view(), name="customer"),
-    path("order/", views.OrderViewClass.as_view(), name="orders_details"),
-    path("order/<int:id>/", views.OrderViewClass.as_view(), name="orders"),
+    path("invoice/", views.InvoiceViewClass.as_view(), name="Invoice_details"),
+    path("invoice/<int:id>/", views.InvoiceViewClass.as_view(), name="Invoice"),
 ]

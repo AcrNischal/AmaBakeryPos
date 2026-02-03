@@ -1,5 +1,6 @@
 import uuid
 
+from decimal import Decimal
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
@@ -37,13 +38,12 @@ class User(AbstractUser):
         blank=True,
     )
 
-    # UPDATED: Added the roles you need
     USER_TYPE_CHOICES = [
         ("ADMIN", "Admin"),
-        ("BRANCH_MANAGER", "Branch Manager"),  # Manages one branch
-        ("WAITER", "Waiter"),  # Table service
-        ("COUNTER", "Counter"),  # Cashier
-        ("KITCHEN", "Kitchen"),  # Kitchen staff
+        ("BRANCH_MANAGER", "Branch Manager"),
+        ("WAITER", "Waiter"),
+        ("COUNTER", "Counter"),
+        ("KITCHEN", "Kitchen"),
     ]
     full_name = models.CharField(max_length=20, blank=True)
     user_type = models.CharField(
@@ -73,7 +73,7 @@ class Product(models.Model):
         return f"{self.name} - {self.category.branch.name}"
 
     class Meta:
-        unique_together = ["name"]
+        unique_together = ["name", "category"]  # Fixed: Added category
 
 
 class Customer(models.Model):
@@ -91,22 +91,133 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.name}"
 
-class Order(models.Model):
+
+class Invoice(models.Model):
+    # Define choices
+    INVOICE_TYPE_CHOICES = [
+        ("SALE", "Sales Invoice"),
+        ("PURCHASE", "Purchase Invoice"),
+        ("SERVICE", "Service Invoice"),
+    ]
+
+    PAYMENT_STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("PARTIAL", "Partially Paid"),
+        ("PAID", "Fully Paid"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
+    # Basic Info
     branch = models.ForeignKey(
-        Branch,
-        on_delete=models.PROTECT,
-        related_name="branch_order",
+        Branch, on_delete=models.PROTECT, related_name="invoices"
     )
-    uid = models.UUIDField(default=uuid.uuid4, editable=False)
-    order_date = models.DateTimeField(default=timezone.now)
     customer = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
-        related_name="orders",
+        related_name="invoices",
+        null=True,
+        blank=True,
     )
+    uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    invoice_number = models.CharField(max_length=50, unique=True, blank=True)
+    invoice_type = models.CharField(
+        max_length=10, choices=INVOICE_TYPE_CHOICES, default="SALE"
+    )
+    order_date = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, related_name="created_orders"
+        User, on_delete=models.SET_NULL, null=True, related_name="created_invoices"
     )
     notes = models.TextField(blank=True, null=True)
     invoice_description = models.TextField(blank=True, null=True)
 
+    # Financial Summary (calculated from bills)
+    subtotal = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    paid_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+
+    # Status
+    payment_status = models.CharField(
+        max_length=10, choices=PAYMENT_STATUS_CHOICES, default="PENDING"
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-order_date"]
+        indexes = [
+            models.Index(fields=["invoice_number"]),
+            models.Index(fields=["order_date"]),
+            models.Index(fields=["payment_status"]),
+            models.Index(fields=["branch", "order_date"]),
+        ]
+
+    def __str__(self):
+        return f"Invoice {self.invoice_number}"
+
+    @property
+    def due_amount(self):
+        """Calculate due amount dynamically"""
+        return Decimal(str(self.total_amount)) - Decimal(str(self.paid_amount))
+
+class InvoiceItem(models.Model):
+    ITEM_TYPE_CHOICES = [
+        ("PRODUCT", "Product"),
+        ("SERVICE", "Service"),
+        ("DISCOUNT", "Discount"),
+        ("OTHER", "Other"),
+    ]
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="bills")
+    item_type = models.CharField(
+        max_length=10, choices=ITEM_TYPE_CHOICES, default="PRODUCT"
+    )
+    product = models.ForeignKey(
+        Product, null=True, blank=True, on_delete=models.SET_NULL, related_name="bills"
+    )
+    description = models.CharField(max_length=255, blank=True, null=True)
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    bill_date = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["bill_date"]
+        indexes = [
+            models.Index(fields=["invoice"]),
+        ]
+
+    def __str__(self):
+        if self.product:
+            return f"{self.product.name} x {self.quantity}"
+        return f"{self.description} x {self.quantity}"
+
+    @property
+    def line_total(self):
+
+        try:
+            total = Decimal(str(self.quantity)) * Decimal(str(self.unit_price))
+            total -= Decimal(str(self.discount_amount))
+            return total
+        except:
+            return Decimal("0")
+
+# models.py
+class Payment(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ("CASH", "Cash"),
+        ("CARD", "Card"),
+        ("UPI", "UPI"),
+        ("CHEQUE", "Cheque"),
+    ]
+    
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="payments")
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default="CASH")
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    payment_date = models.DateTimeField(default=timezone.now)
+    received_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="received_payments")
+    
+    def __str__(self):
+        return f"Payment {self.amount} - {self.invoice.invoice_number}"
