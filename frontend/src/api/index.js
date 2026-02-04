@@ -445,3 +445,39 @@ export async function deleteCustomer(id) {
   if (!res.ok) throw new Error(data?.message || "Failed to delete customer");
   return data;
 }
+
+// Invoice & Checkout APIs
+export async function createInvoice(invoiceData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/invoice/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(invoiceData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create invoice");
+  return data.data;
+}
+
+export async function fetchInvoices() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/invoice/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch invoices");
+  return data.data; // The backend returns { success: true, data: [...] }
+}

@@ -167,7 +167,7 @@ const App = () => (
           <Route
             path="/counter/pos"
             element={
-              <ProtectedRoute allowedRoles={["COUNTER"]}>
+              <ProtectedRoute allowedRoles={["COUNTER", "BRANCH_MANAGER", "ADMIN"]}>
                 <CounterPOS />
               </ProtectedRoute>
             }

@@ -1,17 +1,78 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/kitchen/OrderCard";
-import { sampleOrders, Order, branches, User, getCategories } from "@/lib/mockData";
+import { branches, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
-import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw, MapPin, Utensils, Coffee } from "lucide-react";
+import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw, MapPin, Utensils, Coffee, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { logout } from "../../auth/auth";
+import { fetchInvoices, fetchProducts, fetchCategories } from "@/api/index.js";
 
 
 export default function KitchenDisplay() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>(sampleOrders);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [invoiceData, productData, categoryData] = await Promise.all([
+        fetchInvoices(),
+        fetchProducts(),
+        fetchCategories()
+      ]);
+
+      setProducts(productData);
+      setCategories(categoryData);
+
+      const productsMap = productData.reduce((acc: any, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const mappedInvoices = invoiceData.map((inv: any) => {
+        // Extract table and group from description "Table 1 - Group A"
+        const tableMatch = inv.invoice_description?.match(/Table (\d+)/);
+        const tableNumber = tableMatch ? parseInt(tableMatch[1]) : 0;
+        const groupName = inv.invoice_description?.split(" - ")[1] || "Sale";
+
+        return {
+          id: inv.id.toString(),
+          invoiceNumber: inv.invoice_number,
+          tableNumber,
+          groupName,
+          waiter: inv.created_by_name,
+          createdAt: new Date(inv.order_date),
+          status: inv.payment_status === 'PENDING' ? 'new' :
+            inv.payment_status === 'PARTIAL' ? 'ready' : 'completed',
+          total: parseFloat(inv.total_amount),
+          notes: inv.notes,
+          items: inv.items.map((item: any) => ({
+            quantity: item.quantity,
+            menuItem: {
+              name: productsMap[item.product]?.name || `Product #${item.product}`,
+              category: productsMap[item.product]?.category_name || 'Uncategorized'
+            },
+            notes: item.description // Some backends use description for item-level notes
+          }))
+        };
+      });
+
+      setOrders(mappedInvoices);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load kitchen data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get current user and branch
   const storedUser = localStorage.getItem('currentUser');
@@ -22,28 +83,27 @@ export default function KitchenDisplay() {
   const kitchenType = user?.kitchenType || 'main'; // Default to 'main' if not specified
   const isBreakfastKitchen = kitchenType === 'breakfast';
 
-  // Define Category Mapping
-  // Get categories from configuration (supports dynamic updates from Admin Menu)
-  const categories = getCategories();
-  const relevantCategories = categories
-    .filter(c => c.type === (isBreakfastKitchen ? 'breakfast' : 'main'))
-    .map(c => c.name);
-
   // Filter Orders Logic
   const filteredOrders = orders.map(order => {
     // Filter items based on category
-    const relevantItems = order.items.filter(item =>
-      relevantCategories.includes(item.menuItem.category)
-    );
+    const relevantItems = order.items.filter((item: any) => {
+      // Find the category object for this item
+      const itemCat = categories.find(c => c.name === item.menuItem.category);
+      const kitchenTarget = isBreakfastKitchen ? 'breakfast' : 'main';
+
+      // If categories are empty (not loaded yet) or item matches kitchen type
+      if (categories.length === 0) return true;
+      return itemCat?.type === kitchenTarget;
+    });
 
     // Return order with ONLY relevant items, or null if no items match
     if (relevantItems.length > 0) {
       return { ...order, items: relevantItems };
     }
     return null;
-  }).filter(Boolean) as Order[]; // Remove nulls
+  }).filter(Boolean);
 
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
+  const handleStatusChange = (orderId: string, newStatus: string) => {
     setOrders(prev => prev.map(order =>
       order.id === orderId
         ? { ...order, status: newStatus }
@@ -52,11 +112,11 @@ export default function KitchenDisplay() {
 
     if (newStatus === 'ready') {
       toast.success("Order is ready!", {
-        description: "Moving back to Ready column",
+        description: "Moving to Ready column",
       });
     } else if (newStatus === 'completed') {
       toast.success("Order completed!", {
-        description: "Order has been archiving",
+        description: "Order has been achieved",
       });
     }
   };
@@ -161,7 +221,13 @@ export default function KitchenDisplay() {
       </header>
 
       {/* Kanban Board */}
-      <main className="flex-1 p-4 overflow-hidden">
+      <main className="flex-1 p-4 overflow-hidden relative">
+        {loading && (
+          <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+            <p className="text-xl font-bold text-slate-600">Syncing with backend...</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-6 h-full">
           {/* New Orders Column */}
           <div className="flex flex-col h-full bg-slate-100/50 rounded-xl border border-slate-200 overflow-hidden">

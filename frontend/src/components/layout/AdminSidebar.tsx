@@ -10,12 +10,14 @@ import {
   Settings,
   LogOut,
   ChefHat,
+  Monitor
 } from "lucide-react";
 import { getCurrentUser, logout } from "../../auth/auth";
 
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
+  { icon: Monitor, label: "POS Terminal", path: "/counter/pos" },
   { icon: ClipboardList, label: "Orders", path: "/admin/dashboard/orders" },
   { icon: UtensilsCrossed, label: "Menu", path: "/admin/dashboard/menu" },
   { icon: Package, label: "Inventory", path: "/admin/dashboard/inventory" },

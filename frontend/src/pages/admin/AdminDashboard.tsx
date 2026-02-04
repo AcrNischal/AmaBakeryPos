@@ -1,5 +1,8 @@
 import { StatCard } from "@/components/admin/StatCard";
-import { analyticsData, tables, sampleOrders, branches, User } from "@/lib/mockData";
+import { useState, useEffect } from "react";
+import { analyticsData, tables, branches, User } from "@/lib/mockData";
+import { fetchInvoices } from "@/api/index.js";
+import { toast } from "sonner";
 import {
   DollarSign,
   ShoppingBag,
@@ -7,7 +10,8 @@ import {
   Clock,
   UtensilsCrossed,
   Coffee,
-  MapPin
+  MapPin,
+  Loader2
 } from "lucide-react";
 import {
   BarChart,
@@ -30,6 +34,27 @@ export default function AdminDashboard() {
   const storedUser = localStorage.getItem('currentUser');
   const user: User | null = storedUser ? JSON.parse(storedUser) : null;
   const branch = branches.find(b => b.id === user?.branchId);
+
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadRecentOrders();
+  }, []);
+
+  const loadRecentOrders = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchInvoices();
+      // Show only top 5 recent
+      setRecentOrders(data.slice(0, 5));
+    } catch (err: any) {
+      // Slient fail for dashboard recent orders if it's not the primary focus
+      console.error("Dashboard recent orders failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const liveTableStatus = {
     available: tables.filter(t => t.status === 'available').length,
@@ -230,30 +255,45 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {sampleOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-foreground">
-                    #{order.id.slice(-4)}
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                      <p className="text-muted-foreground text-xs">Syncing recent sales...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : recentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                    No recent orders found.
+                  </td>
+                </tr>
+              ) : recentOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-muted/30 transition-colors text-xs md:text-sm">
+                  <td className="px-6 py-4 font-bold text-foreground">
+                    {order.invoice_number}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-medium">Table {order.tableNumber}</span>
-                      <span className="text-xs text-muted-foreground">{order.groupName || 'Group A'}</span>
+                      <span className="font-medium text-[10px] uppercase text-muted-foreground">{order.branch_name}</span>
+                      <span className="text-xs">{order.invoice_description || 'General Sale'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
                       {order.items.length} items
                     </span>
                   </td>
                   <td className="px-6 py-4 text-muted-foreground">
-                    {order.waiter}
+                    {order.created_by_name}
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={order.status} className="shadow-none border h-6 px-2.5" />
+                    <StatusBadge status={order.payment_status.toLowerCase()} className="shadow-none border h-6 px-2.5" />
                   </td>
-                  <td className="px-6 py-4 text-right font-semibold">
-                    Rs.{order.total}
+                  <td className="px-6 py-4 text-right font-black text-primary">
+                    Rs.{order.total_amount}
                   </td>
                 </tr>
               ))}
