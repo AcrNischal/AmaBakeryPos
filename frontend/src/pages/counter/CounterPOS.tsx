@@ -27,16 +27,18 @@ import {
     Soup,
     Pencil
 } from "lucide-react";
-import { menuItems, MenuItem, User as UserType } from "@/lib/mockData";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { logout, getCurrentUser } from "../../auth/auth";
+import { CustomerSelector } from "@/components/pos/CustomerSelector";
+import { fetchProducts, fetchCategories, createInvoice } from "@/api/index.js";
+import { MenuItem, User as UserType } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { logout } from "../../auth/auth";
 
 
 interface CartItemData {
@@ -48,13 +50,15 @@ interface CartItemData {
 export default function CounterPOS() {
     const navigate = useNavigate();
     const [operator, setOperator] = useState<UserType | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState("Bakery");
+    const [products, setProducts] = useState<MenuItem[]>([]);
+    const [categories, setCategories] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [cart, setCart] = useState<CartItemData[]>([]);
 
     // Billing States
-    const [customerName, setCustomerName] = useState("");
-    const [customerPhone, setCustomerPhone] = useState("");
+    const [customer, setCustomer] = useState<any>(null);
     const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | null>(null);
     const [cashReceived, setCashReceived] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
@@ -68,13 +72,42 @@ export default function CounterPOS() {
     const [qtyInput, setQtyInput] = useState("");
 
     useEffect(() => {
-        const user = localStorage.getItem('currentUser');
+        const user = getCurrentUser();
         if (user) {
-            setOperator(JSON.parse(user));
+            setOperator(user as any);
+            loadData();
         } else {
-            navigate('/counter');
+            navigate('/login');
         }
     }, [navigate]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [productsData, categoriesData] = await Promise.all([
+                fetchProducts(),
+                fetchCategories()
+            ]);
+
+            const mappedProducts: any[] = productsData.map((p: any) => ({
+                id: p.id.toString(),
+                name: p.name,
+                price: parseFloat(p.selling_price),
+                category: p.category_name,
+                available: p.is_available,
+                image: p.image || undefined
+            }));
+
+            setProducts(mappedProducts);
+            const categoryNames = ["All", ...categoriesData.map((cat: any) => cat.name).sort()];
+            setCategories(categoryNames);
+            setSelectedCategory("All");
+        } catch (err: any) {
+            toast.error("Failed to load POS data");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -95,13 +128,9 @@ export default function CounterPOS() {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [showQtyDialog, qtyInput, qtyEditItem]);
 
-    const categories = useMemo(() =>
-        ["All", ...new Set(menuItems.map(item => item.category))],
-        []
-    );
 
     const filteredItems = useMemo(() => {
-        let items = menuItems;
+        let items = products;
         if (selectedCategory !== "All") {
             items = items.filter(item => item.category === selectedCategory);
         }
@@ -111,7 +140,7 @@ export default function CounterPOS() {
             );
         }
         return items;
-    }, [selectedCategory, searchQuery]);
+    }, [products, selectedCategory, searchQuery]);
 
     const subtotal = useMemo(() =>
         cart.reduce((sum, c) => sum + (c.item.price * c.quantity), 0),
@@ -179,7 +208,7 @@ export default function CounterPOS() {
         setShowCheckoutModal(true);
     };
 
-    const processPayment = () => {
+    const processPayment = async () => {
         if (!paymentMethod) {
             toast.error("Please select payment method");
             return;
@@ -190,19 +219,41 @@ export default function CounterPOS() {
         }
 
         setIsProcessing(true);
-        // Simulate processing
-        setTimeout(() => {
+        const user = getCurrentUser();
+
+        try {
+            const invoiceData = {
+                branch: user?.branch_id,
+                customer: customer?.id || null,
+                invoice_type: "SALE",
+                invoice_description: "Counter Sale",
+                tax_amount: taxAmount,
+                discount: 0,
+                paid_amount: total,
+                items: cart.map(c => ({
+                    item_type: "PRODUCT",
+                    product: parseInt(c.item.id),
+                    quantity: c.quantity,
+                    unit_price: c.item.price,
+                    discount_amount: 0
+                }))
+            };
+
+            await createInvoice(invoiceData);
+
             setIsProcessing(false);
             setShowCheckoutModal(false);
             setShowSuccessModal(true);
             toast.success("Transaction completed successfully!");
-        }, 1000);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to process payment");
+            setIsProcessing(false);
+        }
     };
 
     const resetOrder = () => {
         setCart([]);
-        setCustomerName("");
-        setCustomerPhone("");
+        setCustomer(null);
         setPaymentMethod(null);
         setCashReceived("");
         setShowSuccessModal(false);
@@ -432,27 +483,11 @@ export default function CounterPOS() {
 
                             <div className="space-y-6">
                                 <div className="space-y-3">
-                                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Customer (Optional)</Label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="relative">
-                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Name"
-                                                className="pl-9 h-12 rounded-xl"
-                                                value={customerName}
-                                                onChange={(e) => setCustomerName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input
-                                                placeholder="Phone"
-                                                className="pl-9 h-12 rounded-xl"
-                                                value={customerPhone}
-                                                onChange={(e) => setCustomerPhone(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
+                                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Customer </Label>
+                                    <CustomerSelector
+                                        selectedCustomerId={customer?.id}
+                                        onSelect={(c) => setCustomer(c)}
+                                    />
                                 </div>
 
                                 <div className="space-y-3">

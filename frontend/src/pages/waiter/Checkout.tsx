@@ -28,6 +28,9 @@ import { toast } from "sonner";
 import { MenuItem } from "@/lib/mockData";
 import { clearTableOrder } from "@/lib/orderStorage";
 import { cn } from "@/lib/utils";
+import { CustomerSelector } from "@/components/pos/CustomerSelector";
+import { createInvoice } from "@/api/index.js";
+import { getCurrentUser } from "@/auth/auth";
 
 interface CartItemData {
     item: MenuItem;
@@ -49,8 +52,7 @@ export default function Checkout() {
     const location = useLocation();
     const state = location.state as CheckoutState;
 
-    const [customerName, setCustomerName] = useState("");
-    const [customerPhone, setCustomerPhone] = useState("");
+    const [customer, setCustomer] = useState<any>(null);
     const [specialInstructions, setSpecialInstructions] = useState("");
     const [discountPercent, setDiscountPercent] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -62,6 +64,7 @@ export default function Checkout() {
     const [showReceipt, setShowReceipt] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [changeAmount, setChangeAmount] = useState<number | null>(null);
+    const [orderId, setOrderId] = useState<string | null>(null);
 
     // Calculate totals
     const subtotal = useMemo(() =>
@@ -82,6 +85,44 @@ export default function Checkout() {
         [subtotal, taxAmount, discountAmount]
     );
 
+    const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0) => {
+        setIsProcessing(true);
+        const user = getCurrentUser();
+
+        try {
+            const invoiceData = {
+                branch: user?.branch_id,
+                customer: customer?.id || null,
+                invoice_type: "SALE",
+                notes: specialInstructions,
+                invoice_description: `Table ${state?.tableNumber} - ${state?.groupName || "Walk-in"}`,
+                tax_amount: taxAmount,
+                discount: discountAmount,
+                paid_amount: paidAmount,
+                items: state.cart.map(c => ({
+                    item_type: "PRODUCT",
+                    product: parseInt(c.item.id),
+                    quantity: c.quantity,
+                    unit_price: c.item.price,
+                    discount_amount: 0 // Could distribute global discount here if needed
+                }))
+            };
+
+            const result = await createInvoice(invoiceData);
+            setOrderId(result.id); // Assuming ID is returned
+
+            // Clear the order from storage
+            clearTableOrder(state?.tableNumber || "", state?.groupName);
+
+            return result;
+        } catch (err: any) {
+            toast.error(err.message || "Failed to create invoice");
+            throw err;
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleConfirmOrder = async () => {
         if (!paymentTiming) {
             toast.error("Please select payment option", {
@@ -97,28 +138,22 @@ export default function Checkout() {
             return;
         }
 
-        setIsProcessing(true);
-
         if (paymentTiming === "later") {
-            toast.success("Order Confirmed!", {
-                description: `Table ${state?.tableNumber} - Payment Pending`,
-                icon: <Clock className="h-5 w-5 text-warning" />,
-            });
-
-            // Clear the order from storage
-            clearTableOrder(state?.tableNumber || "", state?.groupName);
-
-            setIsProcessing(false);
-            setShowSuccess(true);
+            try {
+                await submitInvoice(false, 0);
+                toast.success("Order Confirmed!", {
+                    description: `Table ${state?.tableNumber} - Payment Pending`,
+                    icon: <Clock className="h-5 w-5 text-warning" />,
+                });
+                setShowSuccess(true);
+            } catch (err) { }
         } else {
             // Pay Now flow - show appropriate modal
             if (paymentMethod === "cod") {
                 setShowCashModal(true);
-                setIsProcessing(false);
             } else {
                 // QR Code payment
                 setShowPaymentConfirmation(true);
-                setIsProcessing(false);
             }
         }
     };
@@ -138,42 +173,36 @@ export default function Checkout() {
             return;
         }
 
-        setIsProcessing(true);
+        try {
+            await submitInvoice(true, total);
+            const change = receivedAmount - total;
 
-        const change = receivedAmount - total;
+            toast.success("Payment Confirmed!", {
+                description: change > 0
+                    ? `Change to return: Rs.${change.toFixed(2)}`
+                    : "Exact amount received",
+                icon: <CheckCircle2 className="h-5 w-5 text-success" />,
+            });
 
-        toast.success("Payment Confirmed!", {
-            description: change > 0
-                ? `Change to return: Rs.${change.toFixed(2)}`
-                : "Exact amount received",
-            icon: <CheckCircle2 className="h-5 w-5 text-success" />,
-        });
-
-        // Clear the order from storage
-        clearTableOrder(state?.tableNumber || "", state?.groupName);
-
-        setIsProcessing(false);
-        setShowCashModal(false);
-        setChangeAmount(change);
-        setShowSuccess(true);
-        setShowReceipt(true);
+            setChangeAmount(change);
+            setShowCashModal(false);
+            setShowSuccess(true);
+            setShowReceipt(true);
+        } catch (err) { }
     };
 
     const handleQRPayment = async () => {
-        setIsProcessing(true);
+        try {
+            await submitInvoice(true, total);
+            toast.success("Payment Confirmed!", {
+                description: `Table ${state?.tableNumber} - Rs.${total.toFixed(2)} paid via QR Code`,
+                icon: <CheckCircle2 className="h-5 w-5 text-success" />,
+            });
 
-        toast.success("Payment Confirmed!", {
-            description: `Table ${state?.tableNumber} - Rs.${total.toFixed(2)} paid via QR Code`,
-            icon: <CheckCircle2 className="h-5 w-5 text-success" />,
-        });
-
-        // Clear the order from storage
-        clearTableOrder(state?.tableNumber || "", state?.groupName);
-
-        setIsProcessing(false);
-        setShowPaymentConfirmation(false);
-        setShowSuccess(true);
-        setShowReceipt(true);
+            setShowPaymentConfirmation(false);
+            setShowSuccess(true);
+            setShowReceipt(true);
+        } catch (err) { }
     };
 
     const handlePrintBill = () => {
@@ -302,10 +331,10 @@ export default function Checkout() {
                                         <p className="text-slate-400 font-bold uppercase text-[9px]">Table / Group</p>
                                         <p className="font-bold">Table {state?.tableNumber} {state?.groupName ? `(${state.groupName})` : ''}</p>
                                     </div>
-                                    {customerName ? (
+                                    {customer ? (
                                         <div className="space-y-1">
                                             <p className="text-slate-400 font-bold uppercase text-[9px]">Customer</p>
-                                            <p className="font-bold truncate">{customerName}</p>
+                                            <p className="font-bold truncate">{customer.name}</p>
                                         </div>
                                     ) : (
                                         <div className="invisible" />
@@ -484,37 +513,21 @@ export default function Checkout() {
                     </div>
                 </Card>
 
-                {/* Customer Details Card */}
                 <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <User className="h-5 w-5 text-primary" />
-                        Customer Details (Optional)
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <User className="h-5 w-5 text-primary" />
+                            Customer Information
+                        </h3>
+                    </div>
 
                     <div className="space-y-4">
-                        <div>
-                            <Label htmlFor="customerName" className="text-sm font-medium">Name</Label>
-                            <Input
-                                id="customerName"
-                                type="text"
-                                placeholder="Enter customer name"
-                                value={customerName}
-                                onChange={(e) => setCustomerName(e.target.value)}
-                                className="mt-1"
-                            />
-                        </div>
+                        <CustomerSelector
+                            selectedCustomerId={customer?.id}
+                            onSelect={(c) => setCustomer(c)}
+                        />
 
-                        <div>
-                            <Label htmlFor="customerPhone" className="text-sm font-medium">Phone Number</Label>
-                            <Input
-                                id="customerPhone"
-                                type="tel"
-                                placeholder="Enter phone number"
-                                value={customerPhone}
-                                onChange={(e) => setCustomerPhone(e.target.value)}
-                                className="mt-1"
-                            />
-                        </div>
+                        <Separator className="my-2" />
 
                         <div>
                             <Label htmlFor="specialInstructions" className="text-sm font-medium">Special Instructions</Label>

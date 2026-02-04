@@ -1,23 +1,44 @@
-import { useState } from "react";
-import { sampleOrders, Order } from "@/lib/mockData";
+import { useState, useEffect } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Download, Eye } from "lucide-react";
+import { Search, Filter, Download, Eye, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { fetchInvoices } from "@/api/index.js";
+import { toast } from "sonner";
 
 export default function AdminOrders() {
-  const [orders] = useState<Order[]>(sampleOrders);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+  useEffect(() => {
+    loadInvoices();
+  }, []);
+
+  const loadInvoices = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchInvoices();
+      setOrders(data);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load invoices");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.waiter.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesSearch =
+      order.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customer_name && order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (order.created_by_name && order.created_by_name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesStatus = statusFilter === 'all' || order.payment_status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -53,9 +74,10 @@ export default function AdminOrders() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="ready">Ready</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="PAID">Paid</SelectItem>
+            <SelectItem value="PARTIAL">Partial</SelectItem>
+            <SelectItem value="CANCELLED">Cancelled</SelectItem>
           </SelectContent>
         </Select>
         <Input type="date" className="w-[180px]" />
@@ -67,39 +89,39 @@ export default function AdminOrders() {
           <table className="w-full">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Order ID</th>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Table</th>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Waiter</th>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Items</th>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Time</th>
+                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Invoice #</th>
+                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Branch</th>
+                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Created By</th>
+                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Customer</th>
+                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Date</th>
                 <th className="px-6 py-4 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-6 py-4 text-left font-medium text-muted-foreground">Payment</th>
                 <th className="px-6 py-4 text-right font-medium text-muted-foreground">Amount</th>
                 <th className="px-6 py-4 text-center font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                      <p className="text-muted-foreground">Loading invoices...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredOrders.map((order) => (
                 <tr key={order.id} className="border-t hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-medium">#{order.id.slice(-4)}</td>
-                  <td className="px-6 py-4">
-                    Table {order.tableNumber}
-                    <span className="ml-2 text-xs bg-secondary px-2 py-0.5 rounded-full">
-                      {order.groupName || 'Group A'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">{order.waiter}</td>
-                  <td className="px-6 py-4">{order.items.length} items</td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {format(order.createdAt, 'h:mm a')}
+                  <td className="px-6 py-4 font-medium">{order.invoice_number}</td>
+                  <td className="px-6 py-4">{order.branch_name}</td>
+                  <td className="px-6 py-4">{order.created_by_name}</td>
+                  <td className="px-6 py-4">{order.customer_name || 'Walk-in'}</td>
+                  <td className="px-6 py-4 text-muted-foreground text-sm">
+                    {format(parseISO(order.order_date), 'MMM d, h:mm a')}
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={order.payment_status.toLowerCase()} />
                   </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={order.paymentStatus} />
-                  </td>
-                  <td className="px-6 py-4 text-right font-semibold">Rs.{order.total}</td>
+                  <td className="px-6 py-4 text-right font-semibold">Rs.{order.total_amount}</td>
                   <td className="px-6 py-4 text-center">
                     <Button
                       variant="ghost"
@@ -126,45 +148,72 @@ export default function AdminOrders() {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Order #{selectedOrder?.id.slice(-4)}</DialogTitle>
+            <DialogTitle>Invoice {selectedOrder?.invoice_number}</DialogTitle>
           </DialogHeader>
 
           {selectedOrder && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Table</p>
-                  <p className="font-medium">Table {selectedOrder.tableNumber}</p>
+                  <p className="text-muted-foreground font-bold text-[10px] uppercase">Branch</p>
+                  <p className="font-medium">{selectedOrder.branch_name}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Waiter</p>
-                  <p className="font-medium">{selectedOrder.waiter}</p>
+                  <p className="text-muted-foreground font-bold text-[10px] uppercase">Created By</p>
+                  <p className="font-medium">{selectedOrder.created_by_name}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Status</p>
-                  <StatusBadge status={selectedOrder.status} />
+                  <p className="text-muted-foreground font-bold text-[10px] uppercase">Customer</p>
+                  <p className="font-medium">{selectedOrder.customer_name || 'Walk-in'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Payment</p>
-                  <StatusBadge status={selectedOrder.paymentStatus} />
+                  <p className="text-muted-foreground font-bold text-[10px] uppercase">Payment Status</p>
+                  <StatusBadge status={selectedOrder.payment_status.toLowerCase()} />
                 </div>
               </div>
 
+              {selectedOrder.notes && (
+                <div className="bg-muted/30 p-2 rounded text-xs italic">
+                  <p className="text-muted-foreground font-bold text-[9px] uppercase mb-1">Notes</p>
+                  {selectedOrder.notes}
+                </div>
+              )}
+
               <div className="border-t pt-4">
-                <p className="text-sm text-muted-foreground mb-2">Items</p>
+                <p className="text-xs font-bold uppercase text-muted-foreground mb-2 tracking-widest">Items</p>
                 <div className="space-y-2">
-                  {selectedOrder.items.map((item, idx) => (
+                  {selectedOrder.items.map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between text-sm">
-                      <span>{item.quantity}× {item.menuItem.name}</span>
-                      <span className="font-medium">Rs.{item.menuItem.price * item.quantity}</span>
+                      <div className="flex flex-col text-left">
+                        <span className="font-medium">{item.quantity}× Product #{item.product}</span>
+                      </div>
+                      <span className="font-medium">Rs.{parseFloat(item.unit_price) * item.quantity}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="border-t pt-4 flex justify-between">
-                <span className="font-semibold">Total</span>
-                <span className="text-xl font-bold text-primary">Rs.{selectedOrder.total}</span>
+              <div className="border-t pt-4 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>Rs.{selectedOrder.subtotal}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>Rs.{selectedOrder.tax_amount}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span>-Rs.{selectedOrder.discount}</span>
+                </div>
+                <div className="border-t mt-2 pt-2 flex justify-between">
+                  <span className="font-bold">Total</span>
+                  <span className="text-xl font-black text-primary">Rs.{selectedOrder.total_amount}</span>
+                </div>
+                <div className="flex justify-between text-xs font-medium text-success">
+                  <span>Paid Amount</span>
+                  <span>Rs.{selectedOrder.paid_amount}</span>
+                </div>
               </div>
             </div>
           )}

@@ -1,22 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
-import { sampleOrders, Order } from "@/lib/mockData";
-import { Clock, ChefHat, Bell, CheckCircle2 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Clock, ChefHat, Bell, CheckCircle2, Loader2 } from "lucide-react";
+import { formatDistanceToNow, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { fetchInvoices } from "@/api/index.js";
 
 export default function OrderStatus() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>(sampleOrders.filter(o => o.status !== 'completed'));
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    loadInvoices();
+  }, []);
 
-  const pendingOrders = orders.filter(o => ['new', 'preparing'].includes(o.status));
-  const readyOrders = orders.filter(o => o.status === 'ready');
+  const loadInvoices = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchInvoices();
+      // Filter for current branch/waiter if needed, but for now showing all active
+      setOrders(data.filter((o: any) => o.payment_status !== 'PAID'));
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pendingOrders = orders.filter(o => o.payment_status === 'PENDING');
+  // Backend doesn't have 'ready' status in the shared snippet, assuming payment_status for now or mapping
+  const readyOrders = orders.filter(o => o.payment_status === 'PARTIAL');
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -73,7 +91,7 @@ export default function OrderStatus() {
         )}
 
         {/* Empty State */}
-        {orders.length === 0 && (
+        {!loading && orders.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <ChefHat className="h-16 w-16 mb-4 opacity-50" />
             <h3 className="text-lg font-medium">No active orders</h3>
@@ -86,6 +104,13 @@ export default function OrderStatus() {
             </Button>
           </div>
         )}
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" />
+            <p className="text-muted-foreground animate-pulse">Checking kitchen status...</p>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -94,31 +119,33 @@ export default function OrderStatus() {
   );
 }
 
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({ order }: { order: any }) {
+  const isReady = order.payment_status === 'PARTIAL';
+
   return (
     <div className={cn(
-      "card-elevated overflow-hidden",
-      order.status === 'ready' && "ring-2 ring-success/50"
+      "card-elevated overflow-hidden transition-all",
+      isReady && "ring-2 ring-success/50 shadow-lg shadow-success/10"
     )}>
       <div className={cn(
         "px-4 py-3 flex items-center justify-between",
-        order.status === 'new' && "bg-blue-50/50",
-        order.status === 'ready' && "bg-success/10"
+        order.payment_status === 'PENDING' && "bg-blue-50/50",
+        isReady && "bg-success/10"
       )}>
         <div className="flex items-center gap-3">
-          <span className="font-bold text-lg">Table {order.tableNumber}</span>
+          <span className="font-bold text-lg">Order #{order.invoice_number.slice(-4)}</span>
           <span className="text-[10px] bg-secondary/50 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-            {order.groupName || 'Group A'}
+            {order.invoice_description || 'Dine-in'}
           </span>
         </div>
-        <StatusBadge status={order.status} />
+        <StatusBadge status={order.payment_status.toLowerCase()} />
       </div>
 
       <div className="p-4">
         <div className="space-y-1 mb-3">
-          {order.items.slice(0, 3).map((item, idx) => (
+          {order.items.slice(0, 3).map((item: any, idx: number) => (
             <div key={idx} className="flex justify-between text-sm">
-              <span>{item.quantity}× {item.menuItem.name}</span>
+              <span>{item.quantity}× Product #{item.product}</span>
             </div>
           ))}
           {order.items.length > 3 && (
@@ -131,10 +158,10 @@ function OrderCard({ order }: { order: Order }) {
         <div className="flex items-center justify-between pt-3 border-t">
           <div className="flex items-center gap-1 text-muted-foreground text-sm">
             <Clock className="h-4 w-4" />
-            {formatDistanceToNow(order.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(parseISO(order.order_date), { addSuffix: true })}
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-bold text-primary mr-2">Rs.{order.total}</span>
+            <span className="font-bold text-primary mr-2">Rs.{order.total_amount}</span>
           </div>
         </div>
       </div>

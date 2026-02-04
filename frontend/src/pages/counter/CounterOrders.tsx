@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     ChevronLeft,
@@ -9,22 +9,42 @@ import {
     MoreHorizontal,
     Monitor,
     Calendar,
-    Filter
+    Filter,
+    Loader2
 } from "lucide-react";
-import { sampleOrders, Order } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { fetchInvoices } from "@/api/index.js";
+import { toast } from "sonner";
 
 export default function CounterOrders() {
     const navigate = useNavigate();
+    const [orders, setOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
 
-    const filteredOrders = sampleOrders.filter(order =>
-        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.tableNumber.toString().includes(searchQuery)
-    ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    useEffect(() => {
+        loadInvoices();
+    }, []);
+
+    const loadInvoices = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchInvoices();
+            setOrders(data);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to load orders");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredOrders = orders.filter(order =>
+        order.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (order.customer_name && order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ).sort((a, b) => new Date(b.order_date).getTime() - new Date(a.order_date).getTime());
 
     return (
         <div className="h-screen bg-stone-50 flex flex-col overflow-hidden font-sans">
@@ -84,7 +104,16 @@ export default function CounterOrders() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filteredOrders.length === 0 ? (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                            <div className="flex flex-col items-center gap-4">
+                                                <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                                                <p className="text-xl font-black text-slate-400">Loading orders...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredOrders.length === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-8 py-20 text-center">
                                             <div className="flex flex-col items-center gap-4 opacity-30">
@@ -97,21 +126,21 @@ export default function CounterOrders() {
                                     filteredOrders.map(order => (
                                         <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-8 py-5">
-                                                <span className="font-mono text-sm font-bold text-slate-600">#{order.id.toUpperCase()}</span>
+                                                <span className="font-mono text-sm font-bold text-slate-600">#{order.invoice_number}</span>
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="flex flex-col">
                                                     <span className="font-black text-slate-800">
-                                                        {order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}
+                                                        {order.customer_name || 'Walk-in'}
                                                     </span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.groupName || 'No Group'}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.invoice_description || 'Sale'}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="flex flex-col gap-1 max-w-[200px]">
-                                                    {order.items.slice(0, 2).map((item, i) => (
+                                                    {order.items.slice(0, 2).map((item: any, i: number) => (
                                                         <span key={i} className="text-xs font-medium text-slate-600 truncate">
-                                                            {item.quantity}x {item.menuItem.name}
+                                                            {item.quantity}x Product #{item.product}
                                                         </span>
                                                     ))}
                                                     {order.items.length > 2 && (
@@ -120,13 +149,13 @@ export default function CounterOrders() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5">
-                                                <span className="text-sm font-medium text-slate-500">{format(order.createdAt, 'hh:mm a')}</span>
+                                                <span className="text-sm font-medium text-slate-500">{format(parseISO(order.order_date), 'hh:mm a')}</span>
                                             </td>
                                             <td className="px-8 py-5">
-                                                <span className="font-black text-slate-900 text-lg">Rs.{order.total}</span>
+                                                <span className="font-black text-slate-900 text-lg">Rs.{order.total_amount}</span>
                                             </td>
                                             <td className="px-8 py-5">
-                                                <StatusBadge status={order.status} />
+                                                <StatusBadge status={order.payment_status.toLowerCase()} />
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

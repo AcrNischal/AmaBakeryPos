@@ -1,17 +1,16 @@
-import { Order } from "@/lib/mockData";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Clock, User, UtensilsCrossed, RotateCcw } from "lucide-react";
+import { Clock, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 interface OrderCardProps {
-  order: Order;
-  onStatusChange: (orderId: string, status: Order['status']) => void;
+  order: any;
+  onStatusChange: (orderId: string, status: string) => void;
 }
 
 export function OrderCard({ order, onStatusChange }: OrderCardProps) {
-  const getNextStatus = (): Order['status'] | null => {
+  const getNextStatus = (): string | null => {
     switch (order.status) {
       case 'new': return 'ready';
       case 'preparing': return 'ready'; // Fallback for any existing preparing orders
