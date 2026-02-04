@@ -108,8 +108,7 @@ class InvoiceViewClass(APIView):
             # Apply branch filter for non-admin users
             filter_kwargs = {"id": id}
             if role not in ["ADMIN", "SUPER_ADMIN"] and my_branch:
-                filter_kwargs["branch"] = my_branch
-
+                filter_kwargs["branch"] = my_branch.id
             invoice = Invoice.objects.get(**filter_kwargs)
         except Invoice.DoesNotExist:
             return Response(
@@ -128,7 +127,7 @@ class InvoiceViewClass(APIView):
             )
 
         # Only allow updating safe fields
-        allowed_fields = ["notes", "invoice_description", "is_active"]
+        allowed_fields = ["notes", "invoice_description", "is_active", "invoice_status"]
         if role in ["ADMIN", "SUPER_ADMIN"]:
             allowed_fields.extend(["tax_amount", "discount"])
 

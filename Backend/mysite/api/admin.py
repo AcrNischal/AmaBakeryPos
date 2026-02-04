@@ -66,6 +66,7 @@ class CustomerAdmin(admin.ModelAdmin):
 class InvoiceAdmin(admin.ModelAdmin):
     list_display = [
         "invoice_number",
+        "id",
         "customer",
         "invoice_type",
         "total_amount",
