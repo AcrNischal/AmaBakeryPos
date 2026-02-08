@@ -217,4 +217,75 @@
   .shadow-warm-xl {
     box-shadow: 0 20px 40px -10px rgba(234, 88, 12, 0.4), 0 10px 15px -8px rgba(234, 88, 12, 0.3);
   }
+
+  /* Print Utilities */
+  @media print {
+    @page {
+      margin: 10mm;
+      size: auto;
+    }
+
+    /* Hide main UI elements */
+    #root,
+    header,
+    nav,
+    aside,
+    footer,
+    .no-print,
+    .no-print-close button {
+      display: none !important;
+    }
+
+    /* Ensure body allows printing */
+    body {
+      background: white !important;
+      overflow: visible !important;
+    }
+
+    /* Ensure radix portals and their children are visible */
+    [data-radix-portal],
+    [data-radix-portal] *,
+    div[role="dialog"],
+    .no-print-close {
+      visibility: visible !important;
+      display: block !important;
+    }
+
+    .printable-receipt {
+      display: block !important;
+      visibility: visible !important;
+      position: static !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 400px !important;
+      background: white !important;
+      box-shadow: none !important;
+      border: none !important;
+      transform: none !important;
+    }
+
+    /* Ensure all children are visible */
+    .printable-receipt,
+    .printable-receipt * {
+      visibility: visible !important;
+      color: black !important;
+    }
+
+    .printable-receipt .text-primary {
+      color: #d19d2a !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Border preservation */
+    .printable-receipt .border-dashed {
+      border-style: dashed !important;
+      border-color: #eee !important;
+    }
+
+    body {
+      background: white !important;
+    }
+  }
 }

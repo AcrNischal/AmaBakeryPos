@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
     Search,
     ShoppingCart,
@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { logout, getCurrentUser } from "../../auth/auth";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
-import { fetchProducts, fetchCategories, createInvoice } from "@/api/index.js";
+import { fetchProducts, fetchCategories, createInvoice, fetchInvoices } from "@/api/index.js";
 import { MenuItem, User as UserType } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ interface CartItemData {
 
 export default function CounterPOS() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [operator, setOperator] = useState<UserType | null>(null);
     const [products, setProducts] = useState<MenuItem[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -64,12 +65,15 @@ export default function CounterPOS() {
     const [customer, setCustomer] = useState<any>(null);
     const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | null>(null);
     const [cashReceived, setCashReceived] = useState("");
+    const [paidAmount, setPaidAmount] = useState(0);
+    const [dueAmount, setDueAmount] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
 
     // Modals
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
+    const [autoPrint, setAutoPrint] = useState(false);
     const [showQtyDialog, setShowQtyDialog] = useState(false);
     const [qtyEditItem, setQtyEditItem] = useState<CartItemData | null>(null);
     const [qtyInput, setQtyInput] = useState("");
@@ -130,6 +134,69 @@ export default function CounterPOS() {
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [showQtyDialog, qtyInput, qtyEditItem]);
+
+    useEffect(() => {
+        if (showReceipt && autoPrint) {
+            const timer = setTimeout(() => {
+                window.print();
+                setAutoPrint(false);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [showReceipt, autoPrint]);
+
+    // Handle loading specific order if passed via state
+    useEffect(() => {
+        if (location.state?.orderId && products.length > 0) {
+            loadSpecificOrder(location.state.orderId);
+        }
+    }, [location.state?.orderId, products]);
+
+    const loadSpecificOrder = async (orderId: number) => {
+        try {
+            const data = await fetchInvoices();
+            if (Array.isArray(data)) {
+                const order = data.find((inv: any) => inv.id === orderId);
+                if (order) {
+                    // Map items
+                    const mappedItems = order.items.map((item: any) => ({
+                        item: products.find(p => p.id === item.product) || {
+                            id: item.product,
+                            name: `Product #${item.product}`,
+                            price: parseFloat(item.unit_price),
+                            category: "Unknown",
+                            available: true
+                        },
+                        quantity: item.quantity
+                    }));
+                    setCart(mappedItems);
+                    setCustomer(order.customer ? { id: order.customer, name: order.customer_name } : null);
+                    setTaxEnabled(parseFloat(order.tax_amount) > 0);
+                    // Estimate tax rate if possible
+                    const sub = order.items.reduce((sum: number, i: any) => sum + (parseFloat(i.unit_price) * i.quantity), 0);
+                    if (sub > 0) {
+                        setTaxRate(Math.round((parseFloat(order.tax_amount) / sub) * 100));
+                    }
+                    setPaidAmount(parseFloat(order.paid_amount || 0));
+                    setDueAmount(parseFloat(order.due_amount || 0));
+                    setShowReceipt(true);
+
+                    // Auto print if requested
+                    if (location.state?.autoPrint) {
+                        setTimeout(() => {
+                            window.print();
+                        }, 500);
+                    }
+
+                    // Clear state so it doesn't reload on every render
+                    window.history.replaceState({}, document.title);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load specific order", err);
+            toast.error("Failed to load order for printing");
+        }
+    };
 
 
     const filteredItems = useMemo(() => {
@@ -658,7 +725,7 @@ export default function CounterPOS() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" className="h-14 rounded-2xl font-black" onClick={() => { setShowReceipt(true); setShowSuccessModal(false); }}>
+                        <Button variant="outline" className="h-14 rounded-2xl font-black" onClick={() => { setAutoPrint(true); setShowReceipt(true); setShowSuccessModal(false); }}>
                             <Printer className="h-5 w-5 mr-2" />
                             Print Bill
                         </Button>
@@ -672,8 +739,8 @@ export default function CounterPOS() {
 
             {/* Receipt View logic would go here, similar to Checkout.tsx but adapted for desktop */}
             <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-                <DialogContent className="max-w-[400px] p-0 bg-transparent border-none shadow-none">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-3xl text-center space-y-6 relative overflow-hidden">
+                <DialogContent className="max-w-[400px] p-0 bg-transparent border-none shadow-none no-print-close">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-3xl text-center space-y-6 relative overflow-hidden printable-receipt">
                         <div className="absolute top-0 left-0 w-full h-2 bg-primary" />
 
                         <div className="space-y-4">
@@ -696,6 +763,10 @@ export default function CounterPOS() {
                             <div className="flex justify-between">
                                 <span>Date:</span>
                                 <span>{new Date().toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Customer:</span>
+                                <span className="truncate ml-4">{customer?.name || "Walk-in"}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Operator:</span>
@@ -721,13 +792,25 @@ export default function CounterPOS() {
                                 <span className="text-slate-400">Total</span>
                                 <span className="text-primary text-2xl">Rs.{total.toFixed(2)}</span>
                             </div>
+                            <div className="flex justify-between text-sm pt-1 border-t border-dashed mt-2">
+                                <span className="text-slate-400 font-bold uppercase text-[10px]">Paid Amount</span>
+                                <span className="font-bold">Rs.{paidAmount > 0 ? paidAmount.toFixed(2) : parseFloat(cashReceived || "0").toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+
+                                {dueAmount > 0 && (
+                                    <>
+                                        <span className="text-slate-400 font-bold uppercase text-[10px]">Balance Due</span>
+                                        <span className="font-bold text-primary">Rs.{dueAmount.toFixed(2)}</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="pt-8 flex gap-3">
-                            <Button variant="ghost" className="flex-1 rounded-xl" onClick={() => { setShowReceipt(false); resetOrder(); }}>Close</Button>
-                            <Button className="flex-1 rounded-xl gradient-warm" onClick={() => window.print()}>
-                                <Printer className="h-4 w-4 mr-2" />
-                                Print
+                        <div className="pt-8 flex gap-3 no-print">
+                            <Button className="flex-1 h-14 rounded-2xl font-black gradient-warm shadow-lg" onClick={() => window.print()}>
+                                <Printer className="h-5 w-5 mr-2" />
+                                Print Bill
                             </Button>
                         </div>
                     </div>
