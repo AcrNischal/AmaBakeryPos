@@ -35,6 +35,8 @@ class BranchAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "location",
+        "created_at",
     )
     list_filter = ("name", "id")
     search_fields = ("name", "name")
@@ -126,8 +128,7 @@ class PaymentAdmin(admin.ModelAdmin):
 
 @admin.register(Table)
 class TableAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "branch",
-        "is_free",
-    )
+    list_display = ("id", "branch", "table_count")
+
+    # Custom order - branch first, then table_count
+    fieldsets = ((None, {"fields": ("branch", "table_count")}),)

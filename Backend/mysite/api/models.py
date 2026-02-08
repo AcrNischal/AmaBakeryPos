@@ -93,11 +93,10 @@ class Customer(models.Model):
 
 
 class Table(models.Model):
-    branch = models.ForeignKey(
+    branch = models.OneToOneField(
         Branch, on_delete=models.CASCADE, related_name="table_branch"
     )
-    is_free = models.BooleanField(default=True)
-    table_no = models.IntegerField()
+    table_count = models.IntegerField(default=1)
 
 
 class Invoice(models.Model):

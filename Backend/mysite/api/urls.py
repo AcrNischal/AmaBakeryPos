@@ -18,7 +18,14 @@ urlpatterns = [
     path("invoice/", views.InvoiceViewClass.as_view(), name="Invoice_details"),
     path("invoice/<int:id>/", views.InvoiceViewClass.as_view(), name="Invoice"),
     path("payments/", views.PaymentView.as_view(), name="payment-list"),
-    path( "invoice/<int:invoice_id>/payments/", views.PaymentView.as_view(), name="payment-by-invoice",),
-    path( "payments/<int:payment_id>/", views.PaymentView.as_view(), name="payment-detail"),
-    path( "table/", views.TableView.as_view(), name="table-details")
+    path(
+        "invoice/<int:invoice_id>/payments/",
+        views.PaymentView.as_view(),
+        name="payment-by-invoice",
+    ),
+    path(
+        "payments/<int:payment_id>/", views.PaymentView.as_view(), name="payment-detail"
+    ),
+    path("table/", views.TableView.as_view(), name="table-details"),
+    path("table/<int:table_id>/", views.TableView.as_view(), name="table-details"),
 ]
