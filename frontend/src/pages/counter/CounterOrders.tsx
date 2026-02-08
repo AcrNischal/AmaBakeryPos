@@ -28,6 +28,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { getCurrentUser } from "@/auth/auth";
+import { X } from "lucide-react";
 
 export default function CounterOrders() {
     const navigate = useNavigate();
@@ -45,6 +47,23 @@ export default function CounterOrders() {
     const [productsMap, setProductsMap] = useState<Record<string, any>>({});
     const [activeTab, setActiveTab] = useState<"payment" | "items">("payment");
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showReceipt, setShowReceipt] = useState(false);
+    const [autoPrint, setAutoPrint] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+
+    useEffect(() => {
+        if (showReceipt && autoPrint) {
+            const timer = setTimeout(() => {
+                window.print();
+                setAutoPrint(false);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [showReceipt, autoPrint]);
+
+    useEffect(() => {
+        setCurrentUser(getCurrentUser());
+    }, []);
 
     useEffect(() => {
         loadInvoices();
@@ -100,6 +119,13 @@ export default function CounterOrders() {
         setPaymentNotes("");
         setActiveTab("payment");
         setShowDetailModal(true);
+    };
+
+    const handleRowPrint = (e: React.MouseEvent, order: any) => {
+        e.stopPropagation();
+        setSelectedOrder(order);
+        setAutoPrint(true);
+        setShowReceipt(true);
     };
 
     const handleRowClick = (order: any) => {
@@ -288,7 +314,7 @@ export default function CounterOrders() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="rounded-xl hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100"
-                                                        onClick={(e) => { e.stopPropagation(); navigate(`/counter/pos`, { state: { orderId: order.id } }); }}
+                                                        onClick={(e) => handleRowPrint(e, order)}
                                                         title="Print"
                                                     >
                                                         <Printer className="h-4 w-4 text-slate-500" />
@@ -474,23 +500,122 @@ export default function CounterOrders() {
                                     <div className="pt-4 border-t border-dashed space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-slate-400 font-bold">Subtotal</span>
-                                            <span className="font-bold text-slate-600">Rs.{selectedOrder?.total_amount}</span>
+                                            <span className="font-bold text-slate-600">Rs.{(parseFloat(selectedOrder?.total_amount || 0) - parseFloat(selectedOrder?.tax_amount || 0)).toFixed(2)}</span>
                                         </div>
+                                        {parseFloat(selectedOrder?.tax_amount || 0) > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-400 font-bold">Tax</span>
+                                                <span className="font-bold text-slate-600">Rs.{parseFloat(selectedOrder?.tax_amount || 0).toFixed(2)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-center pt-2">
                                             <span className="text-lg font-black text-slate-800">Grand Total</span>
                                             <span className="text-2xl font-black text-primary">Rs.{selectedOrder?.total_amount}</span>
                                         </div>
                                     </div>
 
-                                    <Button variant="outline" className="w-full h-14 rounded-2xl font-black gap-2 border-2" onClick={() => navigate(`/counter/pos`, { state: { orderId: selectedOrder?.id } })}>
-                                        <Printer className="h-5 w-5" />
-                                        Print Invoice
-                                    </Button>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Button variant="outline" className="h-14 rounded-2xl font-black gap-2 border-2" onClick={() => { setAutoPrint(true); setShowReceipt(true); }}>
+                                            <Printer className="h-5 w-5" />
+                                            POS Print
+                                        </Button>
+                                        <Button className="h-14 rounded-2xl font-black gap-2 gradient-warm" onClick={() => setShowReceipt(true)}>
+                                            <FileText className="h-5 w-5" />
+                                            View Bill
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                         <div className="p-8 pt-0 flex gap-4">
                             <Button variant="ghost" className="h-12 flex-1 rounded-xl font-bold text-slate-400" onClick={() => setShowDetailModal(false)}>Close</Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Receipt Dialog */}
+            <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+                <DialogContent className="max-w-[400px] p-0 bg-transparent border-none shadow-none no-print-close">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-3xl text-center space-y-6 relative overflow-hidden printable-receipt">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-primary" />
+                        <div className="space-y-4 pt-4">
+                            <div className="h-20 w-20 mx-auto rounded-2xl border border-slate-100 p-1 flex items-center justify-center overflow-hidden">
+                                <img src="/logos/logo1white.jfif" className="h-full w-full object-cover" />
+                            </div>
+                            <div className="space-y-1">
+                                <h1 className="text-2xl font-black tracking-tight text-primary">AMA BAKERY</h1>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Fresh & Daily Bakery</p>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-2 text-left font-mono text-xs">
+                            <div className="flex justify-between">
+                                <span>Receipt:</span>
+                                <span>#{selectedOrder?.invoice_number}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Date:</span>
+                                <span>{selectedOrder?.created_at ? format(parseISO(selectedOrder.created_at), 'yyyy-MM-dd HH:mm') : new Date().toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Customer:</span>
+                                <span className="truncate ml-4">{selectedOrder?.customer_name || "Walk-in"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Operator:</span>
+                                <span>{currentUser?.name}</span>
+                            </div>
+                        </div>
+
+                        <Separator className="border-dashed" />
+
+                        <div className="space-y-2">
+                            {selectedOrder?.items?.map((item: any, idx: number) => {
+                                const productName = productsMap[String(item.product)]?.name || `Product #${item.product}`;
+                                return (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                        <span className="text-left flex-1 font-medium">{productName} x {item.quantity}</span>
+                                        <span className="font-bold">Rs.{(parseFloat(item.unit_price) * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <Separator className="border-dashed" />
+
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-400 font-bold uppercase text-[10px]">Subtotal</span>
+                                <span className="font-bold">Rs.{(parseFloat(selectedOrder?.total_amount || 0) - parseFloat(selectedOrder?.tax_amount || 0)).toFixed(2)}</span>
+                            </div>
+                            {parseFloat(selectedOrder?.tax_amount || 0) > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400 font-bold uppercase text-[10px]">Tax</span>
+                                    <span className="font-bold">Rs.{parseFloat(selectedOrder?.tax_amount || 0).toFixed(2)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-lg font-black pt-2">
+                                <span className="text-slate-400">Total</span>
+                                <span className="text-primary text-2xl">Rs.{selectedOrder?.total_amount}</span>
+                            </div>
+                            <div className="flex justify-between text-sm pt-1 border-t border-dashed mt-2">
+                                <span className="text-slate-400 font-bold uppercase text-[10px]">Paid Amount</span>
+                                <span className="font-bold">Rs.{parseFloat(selectedOrder?.paid_amount || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-400 font-bold uppercase text-[10px]">Balance Due</span>
+                                <span className="font-bold text-primary">Rs.{parseFloat(selectedOrder?.due_amount || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="pt-8 flex gap-3 no-print">
+                            <Button className="flex-1 h-14 rounded-2xl font-black gradient-warm shadow-lg" onClick={() => window.print()}>
+                                <Printer className="h-5 w-5 mr-2" />
+                                Print Bill
+                            </Button>
                         </div>
                     </div>
                 </DialogContent>
