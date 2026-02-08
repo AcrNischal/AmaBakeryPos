@@ -63,7 +63,8 @@ class TableViewClass(APIView):
         if role == "BRANCH_MANAGER":
             if my_branch:
                 comming_branch = request.data.get("branch")
-                if comming_branch and comming_branch.id != my_branch.id:
+                print(f"my branch -> {my_branch.id} , comming branch -> {comming_branch}")
+                if comming_branch and comming_branch != my_branch.id:
                     return Response(
                         {
                             "error": "Permission denied",
