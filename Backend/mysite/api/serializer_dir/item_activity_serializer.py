@@ -2,11 +2,12 @@ from rest_framework import serializers
 
 from ..models import ItemActivity
 
+
 class ItemActivitySerializer(serializers.ModelSerializer):
     product_detail = serializers.CharField(
         source="product.name", read_only=True, required=False
     )
-    
+
     class Meta:
         model = ItemActivity
         fields = [
@@ -16,6 +17,7 @@ class ItemActivitySerializer(serializers.ModelSerializer):
             "types",
             "change",
             "quantity",
+            "created_at",
             "remarks",
         ]
         extra_kwargs = {
