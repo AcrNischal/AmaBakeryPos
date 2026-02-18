@@ -1,6 +1,6 @@
 from rest_framework import status
 from rest_framework.views import APIView, Response
-
+from django.shortcuts import get_object_or_404
 from ..models import ProductCategory
 from ..serializer_dir.category_serializer import ProductCategorySerializer
 
@@ -13,47 +13,56 @@ class CategoryViewClass(APIView):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
-        if not role:  # User has no role
-            return Response({"success": False, "message": "Unauthorized"})
+        if not role:
+            return Response(
+                {"success": False, "message": "Unauthorized"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        
         if id:
-            # Get single category
             try:
                 if role in ["SUPER_ADMIN", "ADMIN"]:
                     category = ProductCategory.objects.get(id=id)
                 else:
-                    category = ProductCategory.objects.get(id=id, branch=my_branch)
-
-                serializer = ProductCategorySerializer(category)
-                return Response({"success": True, "data": serializer.data})
+                    category = ProductCategory.objects.get(
+                        id=id, branch=my_branch
+                    )
 
             except ProductCategory.DoesNotExist:
                 return Response(
                     {"success": False, "message": "Category not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-        else:
-            # Get all categories for user's branch
-            if role in [
-                "SUPER_ADMIN",
-                "ADMIN",
-                "BRANCH_MANAGER",
-                "WAITER",
-                "COUNTER",
-                "KITCHEN",
-            ]:
-                if role == ["SUPER_ADMIN", "ADMIN"]:
-                    categories = ProductCategory.objects.all()
-                else:
-                    categories = ProductCategory.objects.filter(branch=my_branch)
 
-                serializer = ProductCategorySerializer(categories, many=True)
-                return Response({"success": True, "data": serializer.data})
-
+            serializer = ProductCategorySerializer(category)
             return Response(
-                {"success": False, "message": "Insufficient permissions"},
-                status=status.HTTP_403_FORBIDDEN,
+                {"success": True, "data": serializer.data},
+                status=status.HTTP_200_OK,
             )
 
+        if role in [
+            "SUPER_ADMIN",
+            "ADMIN",
+            "BRANCH_MANAGER",
+            "WAITER",
+            "COUNTER",
+            "KITCHEN",
+        ]:
+            if role in ["SUPER_ADMIN", "ADMIN"]:
+                categories = ProductCategory.objects.all()
+            else:
+                categories = ProductCategory.objects.filter(branch=my_branch)
+
+            serializer = ProductCategorySerializer(categories, many=True)
+            return Response(
+                {"success": True, "data": serializer.data},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"success": False, "message": "Insufficient permissions"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     def post(self, request):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
@@ -162,7 +171,7 @@ class CategoryViewClass(APIView):
         try:
             # Get category - SUPER_ADMIN can access any, others only their branch
             if role in ["SUPER_ADMIN", "ADMIN"]:
-                category = ProductCategory.objects.get(id=id)
+                category = ProductCategory.objects.get_object_(id=id)
             else:
                 category = ProductCategory.objects.get(id=id, branch=my_branch)
         except ProductCategory.DoesNotExist:
@@ -191,7 +200,7 @@ class CategoryViewClass(APIView):
 
         # Prepare data - always include current branch for non-SUPER_ADMIN
         data = request.data.copy()
-        if role != "SUPER_ADMIN" or role != "ADMIN":
+        if role not in ["SUPER_ADMIN", "ADMIN"]:
             data["branch"] = my_branch.id
 
         # Update
@@ -223,7 +232,7 @@ class CategoryViewClass(APIView):
 
         if id:
             if role in ["ADMIN", "SUPER_ADMIN"]:
-                category = ProductCategory.objects.get(id=id)
+                category = ProductCategory.objects.get_object_or_404(id=id)
                 category.delete()
                 return Response(
                     {
@@ -232,7 +241,7 @@ class CategoryViewClass(APIView):
                     }
                 )
             if role == "BRANCH_MANAGER":
-                category = ProductCategory.objects.get(id=id)
+                category = ProductCategory.objects.get_object_or_404(id=id)
                 category.delete()
                 return Response(
                     {

@@ -2,10 +2,12 @@ from decimal import Decimal
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
 
+from django.shortcuts import get_object_or_404
 from ..models import ItemActivity, Product
 from ..serializer_dir.item_activity_serializer import ItemActivitySerializer
-
+from django.db import transaction
 
 class ItemActivityClassView(APIView):
     def get_user_role(self, user):
@@ -16,7 +18,7 @@ class ItemActivityClassView(APIView):
         my_branch = request.user.branch
 
         if activity_id:
-            item_activity = ItemActivity.objects.get(id=activity_id)
+            item_activity = get_object_or_404(ItemActivity,id=activity_id)
             serializer = ItemActivitySerializer(item_activity)
         else:
             if product_id:
@@ -33,88 +35,156 @@ class ItemActivityClassView(APIView):
         my_branch = request.user.branch
 
         if action:
-            if product_id:
-                product = Product.objects.get(id=product_id)
-                data = request.data.copy()
+            if action not in ["add", "reduce"]:
+                return Response(
+                    {"success": False, "message": "Invalid action"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
+            if product_id:
+                product = get_object_or_404(Product, id=product_id)
+                data = request.data.copy()
                 data["product"] = product_id
+
+                #  Validate change
+                try:
+                    change = Decimal(data.get("change"))
+                except (TypeError, ValueError):
+                    return Response(
+                        {"success": False, "message": "Invalid change value"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
                 original_qty = product.product_quantity
 
                 if action == "add":
-                    data["quantity"] = original_qty + int(data["change"])
+                    data["quantity"] = original_qty + change
                     data["types"] = "ADD_STOCK"
 
-                if action == "reduce":
-                    data["quantity"] = original_qty - int(data["change"])
+                elif action == "reduce":
+                    data["quantity"] = original_qty - change
                     data["types"] = "REDUCE_STOCK"
 
                 serializer = ItemActivitySerializer(data=data)
 
                 if serializer.is_valid():
-                    product.product_quantity = Decimal(
-                        serializer.validated_data["quantity"]
-                    )
-                    product.save()
-                    serializer.save()
+                    try:
+                        with transaction.atomic():
+                            product.product_quantity = Decimal(
+                                serializer.validated_data["quantity"]
+                            )
+                            product.save()
+                            serializer.save()
 
-                    return Response(
-                        {
-                            "success": True,
-                            "message": "modified product successfully",
-                            "data": serializer.data,
-                        }
-                    )
+                        return Response(
+                            {
+                                "success": True,
+                                "message": "Modified product successfully",
+                                "data": serializer.data,
+                            },
+                            status=status.HTTP_200_OK,
+                        )
+
+                    except Exception as e:
+                        return Response(
+                            {
+                                "success": False,
+                                "message": "Something went wrong",
+                                "error": str(e),  # remove in production
+                            },
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
                 return Response(
                     {
                         "success": False,
                         "message": "Validation error",
                         "errors": serializer.errors,
                     },
-                    status=status.HTTP_400_BAD_REQUEST,  # Changed from 403 to 400
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-    def patch(self, request, item_id):
+        return Response(
+            {"success": False, "message": "Invalid request"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def patch(self, request, activity_id):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
         if role not in ["SUPER_ADMIN", "ADMIN", "BRANCH_MANAGER"]:
-            pass
+            return Response(
+                {"success": False, "message": "Insufficient permissions"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        if item_id:
-            item_activity = ItemActivity.objects.get(id=item_id)
+        item_activity = get_object_or_404(ItemActivity, id=activity_id)
+        data = request.data.copy()
 
-            data = request.data.copy()
+        # Validate change before transaction
+        try:
+            new_change = Decimal(data.get("change"))
+        except (TypeError, ValueError):
+            return Response(
+                {"success": False, "message": "Invalid change value"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            if item_activity.types == "ADD_STOCK":
-                tempqty = item_activity.quantity - int(item_activity.change)
-                item_activity.quantity = tempqty + data["change"]
-                print(item_activity.quantity)
+        try:
+            with transaction.atomic():
 
-            elif item_activity.types == "REDUCE_STOCK":
-                tempqty = item_activity.quantity + int(item_activity.change)
-                item_activity.quantity = tempqty - data["change"]
+                # Reverse old effect and apply new change
+                if item_activity.types == "ADD_STOCK":
+                    tempqty = item_activity.quantity - Decimal(item_activity.change)
+                    item_activity.quantity = tempqty + new_change
 
-            item_activity.change = data["change"]
-            item_activity.save()
+                elif item_activity.types == "REDUCE_STOCK":
+                    tempqty = item_activity.quantity + Decimal(item_activity.change)
+                    item_activity.quantity = tempqty - new_change
 
-            prev = item_activity.quantity
+                item_activity.change = new_change
+                item_activity.save()
 
-            subsequent_activities = ItemActivity.objects.filter(
-                product=item_activity.product, created_at__gt=item_activity.created_at
-            ).order_by("created_at")
+                prev = item_activity.quantity
 
-            for act in subsequent_activities:
-                if act.types == "ADD_STOCK":
-                    act.quantity = prev + int(act.change)
-                elif act.types == "REDUCE_STOCK":
-                    act.quantity = prev - int(act.change)
-                prev = act.quantity
-                act.save()
+                #  Update subsequent activities safely
+                subsequent_activities = ItemActivity.objects.filter(
+                    product=item_activity.product,
+                    created_at__gt=item_activity.created_at,
+                ).order_by("created_at")
 
-            item_activity.product.quantity = subsequent_activities.last().quantity
-            item_activity.product.save()
+                for act in subsequent_activities:
+                    if act.types == "ADD_STOCK":
+                        act.quantity = prev + Decimal(act.change)
+                    elif act.types == "REDUCE_STOCK":
+                        act.quantity = prev - Decimal(act.change)
 
-            serializer = ItemActivitySerializer(item_activity)
+                    prev = act.quantity
+                    act.save()
 
-            return Response({"status": True, "data": serializer.data})
+                #  Safe handling of last()
+                last_activity = subsequent_activities.last()
+
+                if last_activity:
+                    item_activity.product.product_quantity = last_activity.quantity
+                else:
+                    item_activity.product.product_quantity = item_activity.quantity
+
+                item_activity.product.save()
+
+        except Exception as e:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Something went wrong",
+                    "error": str(e),  # remove in production
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        serializer = ItemActivitySerializer(item_activity)
+        return Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_200_OK,
+        )

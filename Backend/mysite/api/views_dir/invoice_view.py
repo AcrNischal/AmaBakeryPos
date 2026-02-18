@@ -14,7 +14,6 @@ from ..serializer_dir.invoice_serializer import (
 
 class InvoiceViewClass(APIView):
     todaydate = date.today()
-    print(todaydate)
 
     def get_user_role(self, user):
         return "SUPER_ADMIN" if user.is_superuser else getattr(user, "user_type", "")
@@ -47,7 +46,7 @@ class InvoiceViewClass(APIView):
             except Invoice.DoesNotExist:
                 return Response(
                     {"success": False, "error": "Invoice not found"},
-                    status=status.HTTP_404_NOT_FOUND,  # ✅ Use status constants
+                    status=status.HTTP_404_NOT_FOUND,  # Use status constants
                 )
         else:
             if role in ["COUNTER", "WAITER", "KITCHEN"]:
@@ -77,7 +76,7 @@ class InvoiceViewClass(APIView):
         if role not in ["ADMIN", "SUPER_ADMIN", "COUNTER", "WAITER", "BRANCH_MANAGER"]:
             return Response(
                 {"success": False, "error": "Permission denied"},
-                status=status.HTTP_403_FORBIDDEN,  # ✅ Use status constants
+                status=status.HTTP_403_FORBIDDEN,  #  Use status constants
             )
 
         serializer = InvoiceSerializer(data=request.data, context={"request": request})

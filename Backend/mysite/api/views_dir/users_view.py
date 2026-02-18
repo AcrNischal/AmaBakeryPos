@@ -261,6 +261,12 @@ class UserViewClass(APIView):
 
         # Delete user
         username = user.username
-        user.delete()
+        try:
+            user.delete()
+        except Exception:
+            return Response(
+                {"success": False, "message": "Cannot delete user."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         return Response({"success": True, "message": f"User '{username}' deleted"})
