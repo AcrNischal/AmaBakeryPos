@@ -521,7 +521,7 @@ export async function addPayment(invoiceId, paymentData) {
 
 export async function createTable(tableData) {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/table/";
+  const url = apiBaseUrl + "/api/floor/";
 
   const res = await fetch(url, {
     method: "POST",
@@ -539,7 +539,7 @@ export async function createTable(tableData) {
 
 export async function fetchTables() {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/table/";
+  const url = apiBaseUrl + "/api/floor/";
 
   const res = await fetch(url, {
     method: "GET",
@@ -556,7 +556,7 @@ export async function fetchTables() {
 
 export async function patchTable(id, tableData) {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/table/${id}/`;
+  const url = apiBaseUrl + `/api/floor/${id}/`;
 
   const res = await fetch(url, {
     method: "PATCH",
@@ -570,6 +570,25 @@ export async function patchTable(id, tableData) {
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update table");
   return data.data;
+}
+
+export async function deleteTable(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/floor/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    throw new Error(data?.message || "Failed to delete table");
+  }
+  return true;
 }
 
 // Item Activity & Stock Management

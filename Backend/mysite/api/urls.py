@@ -27,8 +27,8 @@ urlpatterns = [
     path(
         "payments/<int:payment_id>/", views.PaymentView.as_view(), name="payment-detail"
     ),
-    path("table/", views.FloorView.as_view(), name="table-details"),
-    path("table/<int:floor_id>/", views.FloorView.as_view(), name="table-details"),
+    path("floor/", views.FloorView.as_view(), name="floor-detail"),
+    path("floor/<int:floor_id>/", views.FloorView.as_view(), name="floor-details"),
     path(
         "itemactivity/<int:product_id>/<str:action>/",
         views.ItemActivityView.as_view(),

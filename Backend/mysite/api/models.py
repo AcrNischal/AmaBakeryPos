@@ -143,7 +143,9 @@ class Invoice(models.Model):
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="created_invoices"
     )
-    floor = models.ForeignKey(Floor,on_delete=models.SET_NULL,null=True,related_name="floor_invoices")
+    floor = models.ForeignKey(
+        Floor, on_delete=models.SET_NULL, null=True, related_name="floor_invoices"
+    )
     notes = models.TextField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
 
