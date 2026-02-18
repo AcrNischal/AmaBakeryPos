@@ -27,59 +27,73 @@ class BranchViewClass(APIView):
                     "branch_user"  # Assuming User has foreign key to Branch
                 ).get(id=id)
 
-                serializer = BranchSerializers(branch)
-                response_data = dict(serializer.data)
-
-                # Get manager from prefetched users
-                manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
-
-                if manager:
-                    response_data["branch_manager"] = {
-                        "id": manager.id,
-                        "username": manager.username,
-                        "total_user": branch.branch_user.count(),
-                    }
-                else:
-                    response_data["branch_manager"] = None
-
-                return Response({"success": True, "data": response_data})
-
             except Branch.DoesNotExist:
                 return Response(
                     {"success": False, "message": "Branch not found."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-        else:
+
+            except Exception:
+                return Response(
+                {"success": False, "message": "Something went wrong while fetching branch."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+                
+            serializer = BranchSerializers(branch)
+            response_data = dict(serializer.data)
+
+            # Get manager from prefetched users
+            manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
+
+            if manager:
+                response_data["branch_manager"] = {
+                        "id": manager.id,
+                        "username": manager.username,
+                        "total_user": branch.branch_user.count(),
+                    }
+            else:
+                    response_data["branch_manager"] = None
+
+            return Response({"success": True, "data": response_data})
+
+            
+        try:
             # All branches with prefetch (most efficient)
             branches = Branch.objects.prefetch_related("branch_user").all()
+        except Exception:
+            return Response(
+                    {"success": False, "message": "Something went wrong while fetching branches."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
-            response_data = []
-            for branch in branches:
-                # Serialize each branch
-                branch_data = BranchSerializers(branch).data
-                branch_dict = dict(branch_data)
+        response_data = []
+        for branch in branches:
+            # Serialize each branch
+            branch_data = BranchSerializers(branch).data
+            branch_dict = dict(branch_data)
 
-                # Get manager from prefetched users
-                manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
+            # Get manager from prefetched users
+            manager = branch.branch_user.filter(user_type="BRANCH_MANAGER").first()
 
-                if manager:
-                    branch_dict["branch_manager"] = {
+            if manager:
+                branch_dict["branch_manager"] = {
                         "id": manager.id,
                         "username": manager.username,
                         "email": manager.email,
                         "total_user": branch.branch_user.count(),
                     }
-                else:
-                    branch_dict["branch_manager"] = None
+            else:
+                branch_dict["branch_manager"] = None
 
-                response_data.append(branch_dict)
+            response_data.append(branch_dict)
 
-            return Response(
-                {"success": True, "count": len(response_data), "data": response_data}
+        return Response(
+            {"success": True, "count": len(response_data), "data": response_data}
             )
 
     # --- POST (Create) ---
     def post(self, request):
+        #  Safe role fetching
         role = self.get_user_role(request.user)
 
         if role not in ["SUPER_ADMIN", "ADMIN"]:
@@ -95,40 +109,52 @@ class BranchViewClass(APIView):
         new_name = request.data.get("name", "").strip()
         if not new_name:
             return Response(
-                {
-                    "success": False,
-                    "message": "Branch name is required.",
-                },
+                {"success": False, "message": "Branch name is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check for duplicate (case-insensitive)
-        if Branch.objects.filter(name__iexact=new_name).exists():
+        # Check duplicate safely
+        try:
+            if Branch.objects.filter(name__iexact=new_name).exists():
+                return Response(
+                    {
+                        "success": False,
+                        "message": f"A branch named '{new_name}' already exists.",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        except Exception:
             return Response(
                 {
                     "success": False,
-                    "message": f"A branch named '{new_name}' already exists.",
+                    "message": "Error while checking branch name.",
                 },
-                status=status.HTTP_409_CONFLICT,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         # Validate location
         location = request.data.get("location", "").strip()
         if not location:
             return Response(
-                {
-                    "success": False,
-                    "message": "Location is required.",
-                },
+                {"success": False, "message": "Location is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Prepare data
         data = request.data.copy()
         serializer = BranchSerializers(data=data, context={"request": request})
 
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except Exception:
+                return Response(
+                    {
+                        "success": False,
+                        "message": "Something went wrong while creating branch.",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
             return Response(
                 {
                     "success": True,
@@ -137,21 +163,21 @@ class BranchViewClass(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-        else:
-            return Response(
-                {
-                    "success": False,
-                    "errors": serializer.errors,
-                    "message": "Validation failed",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
+        return Response(
+            {
+                "success": False,
+                "errors": serializer.errors,
+                "message": "Validation failed",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     # --- PATCH (Update) ---
     def patch(self, request, id=None):
+        #  Safe role fetching
         role = self.get_user_role(request.user)
 
-        # Permission check
+        #  Permission check
         if role not in ["SUPER_ADMIN", "ADMIN"]:
             return Response(
                 {
@@ -167,6 +193,7 @@ class BranchViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        #  Get branch safely
         try:
             branch = Branch.objects.get(id=id)
         except Branch.DoesNotExist:
@@ -174,30 +201,58 @@ class BranchViewClass(APIView):
                 {"success": False, "message": "Branch not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Error while fetching branch.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        # Check for duplicate name (case-insensitive)
+        # Duplicate name check (safe)
         new_name = request.data.get("name", "").strip()
         if new_name and new_name.lower() != branch.name.lower():
-            if (
-                Branch.objects.filter(name__iexact=new_name)
-                .exclude(id=branch.id)
-                .exists()
-            ):
+            try:
+                if (
+                    Branch.objects.filter(name__iexact=new_name)
+                    .exclude(id=branch.id)
+                    .exists()
+                ):
+                    return Response(
+                        {
+                            "success": False,
+                            "message": f"A branch named '{new_name}' already exists.",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            except Exception:
                 return Response(
                     {
                         "success": False,
-                        "message": f"A branch named '{new_name}' already exists.",
+                        "message": "Error while validating branch name.",
                     },
-                    status=status.HTTP_409_CONFLICT,
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        # Update branch
+        #  Update branch
         serializer = BranchSerializers(
             branch, data=request.data, partial=True, context={"request": request}
         )
 
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+    
+            except Exception:
+                return Response(
+                    {
+                        "success": False,
+                        "message": "Something went wrong while updating branch.",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
             return Response(
                 {
                     "success": True,
@@ -206,21 +261,21 @@ class BranchViewClass(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        else:
-            return Response(
-                {
-                    "success": False,
-                    "errors": serializer.errors,
-                    "message": "Validation failed",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
+        return Response(
+            {
+                "success": False,
+                "errors": serializer.errors,
+                "message": "Validation failed",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     # --- DELETE (Safe Delete) ---
-    def delete(self, request, id=None):
-        role = self.get_user_role(request.user)
 
-        # Only SUPER_ADMIN can delete branches
+    def delete(self, request, id=None):
+        # Safe role fetching
+        role = self.get_user_role(request.user)
+        # Permission check
         if role not in ["SUPER_ADMIN", "ADMIN"]:
             return Response(
                 {
@@ -236,6 +291,7 @@ class BranchViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Fetch branch safely
         try:
             branch = Branch.objects.get(id=id)
         except Branch.DoesNotExist:
@@ -243,10 +299,27 @@ class BranchViewClass(APIView):
                 {"success": False, "message": "Branch not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Error while fetching branch.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        # Check if branch has any associated data
-        user_count = User.objects.filter(branch=branch).count()
-        category_count = ProductCategory.objects.filter(branch=branch).count()
+        #  Check related data safely
+        try:
+            user_count = User.objects.filter(branch=branch).count()
+            category_count = ProductCategory.objects.filter(branch=branch).count()
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Error while checking related data.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         if user_count > 0 or category_count > 0:
             error_parts = []
@@ -272,9 +345,18 @@ class BranchViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Safe to delete (no associated data)
+        #  Safe delete
         branch_name = branch.name
-        branch.delete()
+        try:
+            branch.delete()
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Something went wrong while deleting branch.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response(
             {

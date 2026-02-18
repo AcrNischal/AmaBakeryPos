@@ -1,2 +1,0 @@
-if "sahil":
-    print("hello")

@@ -143,7 +143,7 @@ class CustomerViewClass(APIView):
 
     # --- PATCH (Partial Update) ---
     @transaction.atomic
-    def patch(self, request, id=None):
+    def patch(self, request, id):
         if not id:
             return Response(
                 {"success": False, "message": "Customer ID required"},
@@ -210,7 +210,7 @@ class CustomerViewClass(APIView):
 
     # --- DELETE ---
     @transaction.atomic
-    def delete(self, request, id=None):
+    def delete(self, request, id):
         if not id:
             return Response(
                 {"success": False, "message": "Customer ID required"},

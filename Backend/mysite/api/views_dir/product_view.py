@@ -4,7 +4,8 @@ from rest_framework.views import APIView, Response
 from ..models import Product, ProductCategory
 from ..serializer_dir.item_activity_serializer import ItemActivitySerializer
 from ..serializer_dir.product_serializer import ProductSerializer
-
+from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 class ProductViewClass(APIView):
     def get_user_role(self, user):
@@ -14,27 +15,19 @@ class ProductViewClass(APIView):
         pass
 
     def get(self, request, id=None):
+        
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
         if id:
             # get single product
-            print("this is role hahaha ", role)
-            if role in [
-                "SUPER_ADMIN",
-                "ADMIN",
-                "BRANCH_MANAGER",
-                "WAITER",
-                "COUNTER",
-                "KITCHEN",
-            ]:
-                branch_product = Product.objects.get(id=id)
+            if role in ["SUPER_ADMIN","ADMIN","BRANCH_MANAGER", "WAITER", "COUNTER", "KITCHEN"]:
+                branch_product = get_object_or_404(Product,id=id)
                 if branch_product.category.branch == my_branch:
                     product_details = ProductSerializer(branch_product)
                     return Response({"success": True, "data": product_details.data})
 
             if role in ["SUPER_ADMIN", "ADMIN"]:
-                product = Product.objects.get(id=id)
-
+                product = get_object_or_404(Product, id=id)
                 serilizer = ProductSerializer(product)
                 return Response({"success": True, "data": serilizer.data})
         else:
@@ -83,7 +76,6 @@ class ProductViewClass(APIView):
         # Get and validate product name
         product_name = request.data.get("name", "").strip()
         if not product_name:
-            print("i reach at not product_name if condition!")
             return Response(
                 {
                     "success": False,
@@ -154,19 +146,20 @@ class ProductViewClass(APIView):
 
         if serializer.is_valid():
             try:
-                serializer.save()
+                with transaction.atomic():
+                    serializer.save()
 
-                itemactivity = {
-                    "change": serializer.validated_data["product_quantity"],
-                    "quantity": serializer.validated_data["product_quantity"],
-                    "product": serializer.data["id"],
-                    "types": "ADD_STOCK",
-                    "remarks": "Opening Stock",
-                }
+                    itemactivity = {
+                        "change": serializer.validated_data["product_quantity"],
+                        "quantity": serializer.validated_data["product_quantity"],
+                        "product": serializer.data["id"],
+                        "types": "ADD_STOCK",
+                        "remarks": "Opening Stock",
+                    }
 
-                itemserilizer = ItemActivitySerializer(data=itemactivity)
-                if itemserilizer.is_valid():
-                    itemserilizer.save()
+                    itemserilizer = ItemActivitySerializer(data=itemactivity)
+                    if itemserilizer.is_valid():
+                        itemserilizer.save()
 
                 return Response(
                     {
@@ -196,7 +189,7 @@ class ProductViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def put(self, request, id=None):
+    def put(self, request, id):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
@@ -344,7 +337,7 @@ class ProductViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def delete(self, request, id=None):
+    def delete(self, request, id):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
@@ -369,7 +362,13 @@ class ProductViewClass(APIView):
                 product = Product.objects.get(id=id, category__branch=my_branch)
 
             product_name = product.name
-            product.delete()
+            try:
+                product.delete()
+            except Exception:
+                return Response(
+                {"success": False, "message": "Cannot delete product."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
             return Response(
                 {
