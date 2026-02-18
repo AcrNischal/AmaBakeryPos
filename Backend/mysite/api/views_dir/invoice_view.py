@@ -1,4 +1,5 @@
 from datetime import date
+
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
@@ -27,6 +28,10 @@ class InvoiceViewClass(APIView):
     def get(self, request, id=None):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
+        from django.utils import timezone
+
+        current_time = timezone.now()
+        print(current_time)
 
         if id:
             try:
@@ -185,4 +190,3 @@ class InvoiceViewClass(APIView):
                 {"success": False, "error": "Invoice not found"},
                 status=status.HTTP_404_NOT_FOUND,  # ✅ Use status constants
             )
-        

@@ -42,7 +42,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=2),
 }
 
@@ -125,11 +125,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
-USE_I18N = True
-USE_TZ = True
 AUTH_USER_MODEL = "api.User"
 
 
@@ -139,7 +135,12 @@ AUTH_USER_MODEL = "api.User"
 STATIC_URL = "static/"
 
 USE_TZ = True
+
+
+LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Kathmandu"
+USE_I18N = True
+USE_TZ = True
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

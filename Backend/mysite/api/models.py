@@ -270,7 +270,7 @@ class ItemActivity(models.Model):
     TYPE_CHOICES = [
         ("ADD_STOCK", "Add Stock"),
         ("REDUCE_STOCK", "Reduce Stock"),
-        ("EDIT_STOCK","Edit Stock")
+        ("EDIT_STOCK", "Edit Stock"),
     ]
     types = models.CharField(max_length=50, choices=TYPE_CHOICES)
     remarks = models.TextField(blank=True)
