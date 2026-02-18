@@ -1,11 +1,12 @@
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.views import APIView, Response
 
 from ..models import Product, ProductCategory
 from ..serializer_dir.item_activity_serializer import ItemActivitySerializer
 from ..serializer_dir.product_serializer import ProductSerializer
-from django.shortcuts import get_object_or_404
-from django.db import transaction
+
 
 class ProductViewClass(APIView):
     def get_user_role(self, user):
@@ -15,13 +16,19 @@ class ProductViewClass(APIView):
         pass
 
     def get(self, request, id=None):
-        
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
         if id:
             # get single product
-            if role in ["SUPER_ADMIN","ADMIN","BRANCH_MANAGER", "WAITER", "COUNTER", "KITCHEN"]:
-                branch_product = get_object_or_404(Product,id=id)
+            if role in [
+                "SUPER_ADMIN",
+                "ADMIN",
+                "BRANCH_MANAGER",
+                "WAITER",
+                "COUNTER",
+                "KITCHEN",
+            ]:
+                branch_product = get_object_or_404(Product, id=id)
                 if branch_product.category.branch == my_branch:
                     product_details = ProductSerializer(branch_product)
                     return Response({"success": True, "data": product_details.data})
@@ -38,7 +45,6 @@ class ProductViewClass(APIView):
 
             if role in ["ADMIN", "SUPER_ADMIN"]:
                 products = Product.objects.all()
-
 
             # products = Product.objects.raw("select * from api_Product")
             #
@@ -189,7 +195,7 @@ class ProductViewClass(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    def put(self, request, id):
+    def patch(self, request, id):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
@@ -366,9 +372,9 @@ class ProductViewClass(APIView):
                 product.delete()
             except Exception:
                 return Response(
-                {"success": False, "message": "Cannot delete product."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+                    {"success": False, "message": "Cannot delete product."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
             return Response(
                 {

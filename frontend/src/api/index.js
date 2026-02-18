@@ -521,7 +521,7 @@ export async function addPayment(invoiceId, paymentData) {
 
 export async function createTable(tableData) {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/table/";
+  const url = apiBaseUrl + "/api/floor/";
 
   const res = await fetch(url, {
     method: "POST",
@@ -539,7 +539,7 @@ export async function createTable(tableData) {
 
 export async function fetchTables() {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/table/";
+  const url = apiBaseUrl + "/api/floor/";
 
   const res = await fetch(url, {
     method: "GET",
@@ -556,7 +556,7 @@ export async function fetchTables() {
 
 export async function patchTable(id, tableData) {
   const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/table/${id}/`;
+  const url = apiBaseUrl + `/api/floor/${id}/`;
 
   const res = await fetch(url, {
     method: "PATCH",
