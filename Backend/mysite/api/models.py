@@ -271,6 +271,7 @@ class ItemActivity(models.Model):
         ("ADD_STOCK", "Add Stock"),
         ("REDUCE_STOCK", "Reduce Stock"),
         ("EDIT_STOCK", "Edit Stock"),
+        ('SALES',"Sales"),
     ]
     types = models.CharField(max_length=50, choices=TYPE_CHOICES)
     remarks = models.TextField(blank=True)
