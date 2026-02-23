@@ -1,7 +1,8 @@
 from decimal import Decimal
 from rest_framework import serializers
 from ..models import Invoice, InvoiceItem  # adjust import path if needed
-
+from .item_activity_serializer import ItemActivitySerializer
+from django.db import transaction
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,11 +40,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "floor",
             # Intentionally NO created_at, created_by, subtotal, total_amount, etc.
         ]
-
+    @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items")
         paid_amount = validated_data.pop("paid_amount", Decimal("0.00"))
         request = self.context.get("request")
+        notes = validated_data.get('notes',"")
 
         # Create invoice skeleton
         invoice = Invoice.objects.create(
@@ -65,8 +67,23 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice=invoice,
                 **item_data
             )
+            
+            item.product.product_quantity -= item.quantity
+            item.product.save()
             line_total = item.quantity * item.unit_price - item.discount_amount
             subtotal += line_total
+        
+            itemactivity = {
+                        "change": str(item.quantity),
+                        "quantity": item.product.product_quantity,
+                        "product": item.product_id,
+                        "types": "SALES",
+                        "remarks": notes,
+                    }
+
+            itemserializer = ItemActivitySerializer(data=itemactivity)
+            itemserializer.is_valid(raise_exception=True)
+            itemserializer.save()
 
         # Final totals
         invoice.subtotal = subtotal
