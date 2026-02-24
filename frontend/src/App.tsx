@@ -46,6 +46,7 @@ import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 const queryClient = new QueryClient();
 
 import { isLoggedIn, getCurrentUser } from "./auth/auth";
+import { GlobalLogout } from "@/components/ui/GlobalLogout";
 
 const roleRedirectPath = (role?: string) => {
   switch (role) {
@@ -97,6 +98,7 @@ const App = () => (
       <Toaster />
       <Sonner position="top-center" />
       <BrowserRouter>
+        <GlobalLogout />
         <Routes>
           {/* ✅ MAIN ENTRY */}
           <Route path="/" element={<HomeRedirect />} />

@@ -13,7 +13,7 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
   const getNextStatus = (): string | null => {
     switch (order.status) {
       case 'new': return 'ready';
-      case 'preparing': return 'ready'; // Fallback for any existing preparing orders
+      case 'preparing': return 'ready';
       case 'ready': return 'completed';
       default: return null;
     }
@@ -29,80 +29,88 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
   };
 
   const nextStatus = getNextStatus();
-  const timeAgo = formatDistanceToNow(order.createdAt, { addSuffix: true });
+  const timeAgo = formatDistanceToNow(new Date(order.createdAt), { addSuffix: true });
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow duration-300">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full hover:shadow-lg transition-all duration-300">
       {/* Status Header Strip */}
       <div className={cn(
-        "h-1 w-full",
+        "h-1.5 w-full",
         order.status === 'new' && "bg-blue-500",
         order.status === 'preparing' && "bg-amber-500",
         order.status === 'ready' && "bg-emerald-500",
         order.status === 'completed' && "bg-slate-400"
       )} />
 
-      {/* Card Header */}
-      <div className="p-3 border-b border-slate-100 flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg font-bold text-slate-800">#{order.id.slice(-3)}</span>
-            <StatusBadge status={order.status} className={cn(
-              "text-[10px] px-1.5 py-0 border-none",
-              order.status === 'new' && "bg-blue-50 text-blue-700",
-              order.status === 'preparing' && "bg-amber-50 text-amber-700",
-              order.status === 'ready' && "bg-emerald-50 text-emerald-700"
-            )} />
-          </div>
-          <div className="flex items-center gap-1 text-slate-400 text-xs font-medium">
-            <Clock className="h-3 w-3" />
-            <span>{timeAgo}</span>
+      {/* Card Header (Minimized Metadata) */}
+      <div className="px-4 py-2 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-black text-slate-400">#{order.id.slice(-3)}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+              <Clock className="h-3 w-3 opacity-60" />
+              <span>{timeAgo}</span>
+            </div>
+            {order.waiter && (
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-px bg-slate-200" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[100px]">
+                  {order.waiter}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-sm font-bold text-slate-700">Tb {order.tableNumber}</div>
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{order.groupName || 'Group A'}</div>
-          {order.floorName && (
-            <div className="text-[9px] font-black text-primary uppercase mt-0.5 px-1.5 py-0.5 bg-primary/5 rounded border border-primary/10 inline-block">
-              {order.floorName}
+        <div className="flex items-center gap-4">
+          <div className="text-right flex flex-col">
+            <div className="flex items-center justify-end">
+              <span className="text-sm font-black text-slate-700">Tb {order.tableNumber}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase ml-2">{order.groupName || 'A'}</span>
             </div>
-          )}
-          <div className="text-xs text-slate-400 mt-1">{order.waiter}</div>
+            {order.floorName && (
+              <span className="text-[8px] font-black text-primary uppercase px-1.5 py-0.5 bg-primary/5 rounded border border-primary/10 mt-0.5 self-end">
+                {order.floorName}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Items List */}
-      <div className="p-3 flex-grow space-y-2">
+      <div className="p-4 flex-grow space-y-2">
         {order.items?.map((item: any, index: number) => (
-          <div key={index} className="flex gap-2 items-start">
-            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold mt-0.5">
-              {item.quantity}
-            </div>
-            <div className="flex-grow min-w-0">
-              <p className="text-sm font-semibold text-slate-800 leading-tight">
+          <div key={index} className="flex flex-col group bg-slate-50/30 p-3 rounded-xl border border-transparent hover:border-slate-200 transition-all">
+            <div className="flex justify-between items-center gap-4">
+              <p className="text-lg font-black text-slate-800 leading-tight tracking-tight capitalize">
                 {item.menuItem.name}
               </p>
-              {item.notes && (
-                <p className="text-xs text-amber-600 italic leading-tight">
+              <div className="flex-shrink-0 min-w-[40px] h-10 px-2 rounded-lg bg-white border-2 border-slate-200 flex items-center justify-center text-xl font-black text-slate-900 shadow-sm">
+                x{item.quantity}
+              </div>
+            </div>
+            {item.notes && (
+              <div className="mt-2 flex items-start gap-1.5 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                <span className="text-amber-600 text-[10px] font-black uppercase mt-0.5 tracking-tighter">SPEC:</span>
+                <p className="text-[13px] text-amber-700 font-bold italic leading-tight">
                   {item.notes}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {/* Actions */}
       {nextStatus && (
-        <div className="p-2 border-t border-slate-50 bg-slate-50/50 flex gap-2">
+        <div className="p-3 border-t border-slate-50 bg-white flex gap-2">
           <Button
-            size="sm"
+            size="lg"
             className={cn(
-              "flex-1 font-semibold shadow-none h-8",
-              order.status === 'new' && "bg-blue-600 hover:bg-blue-700",
-              order.status === 'preparing' && "bg-amber-600 hover:bg-amber-700 text-white",
-              order.status === 'ready' && "bg-emerald-600 hover:bg-emerald-700"
+              "flex-1 font-black shadow-lg shadow-slate-200/50 h-11 rounded-xl text-base transition-all active:scale-95",
+              order.status === 'new' && "bg-blue-600 hover:bg-blue-700 shadow-blue-200/50",
+              order.status === 'preparing' && "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200/50",
+              order.status === 'ready' && "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200/50"
             )}
             onClick={() => onStatusChange(order.id, nextStatus)}
           >
@@ -111,8 +119,8 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
           {order.status === 'ready' && (
             <Button
               variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50"
+              size="icon"
+              className="h-11 w-11 rounded-xl border-slate-100 text-slate-300 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50 shadow-sm"
               onClick={() => onStatusChange(order.id, 'new')}
               title="Reverse to New"
             >

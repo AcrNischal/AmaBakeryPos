@@ -16,7 +16,7 @@ export function SuperAdminLayout() {
             </aside>
 
             {/* Mobile Header */}
-            <div className="md:hidden sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+            <div className="md:hidden sticky top-0 z-30 flex items-center justify-between p-4 pr-14 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
                 <div className="flex items-center gap-3">
                     <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                         <SheetTrigger asChild>

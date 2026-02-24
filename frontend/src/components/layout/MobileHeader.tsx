@@ -14,13 +14,9 @@ import {
   User as UserIcon,
   LogOut,
   Settings,
-  HelpCircle,
-  MapPin
+  HelpCircle
 } from "lucide-react";
-import { toast } from "sonner";
-import { branches, User } from "@/lib/mockData";
-import { logout } from "@/auth/auth";
-
+import { logout, getCurrentUser } from "@/auth/auth";
 
 interface MobileHeaderProps {
   title: string;
@@ -33,12 +29,13 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
   const navigate = useNavigate();
 
   // Get current user and branch
-  const storedUser = localStorage.getItem('currentUser');
-  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
-  const branch = branches.find(b => b.id === user?.branchId);
+  const user = getCurrentUser();
+  const userName = user?.username || "Staff";
+  const userRole = user?.role || "Staff";
+  const branchName = user?.branch_name || "Ama Bakery";
 
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b px-4 py-3">
+    <header className="sticky top-0 z-50 glass-panel border-b px-4 pr-14 py-3 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {showBack && (
@@ -46,31 +43,25 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
               variant="ghost"
               size="icon"
               onClick={() => navigate(-1)}
-              className="h-10 w-10"
+              className="h-10 w-10 text-slate-500 hover:bg-slate-100"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-md bg-white p-0.5 shadow-sm border border-slate-100 shrink-0 overflow-hidden">
-                <img src="/logos/logo1white.jfif" alt="Logo" className="h-full w-full object-cover" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary flex items-center gap-1">
-                <MapPin className="h-2 w-2" />
-                {branch?.name || "Ama Bakery"}
-              </p>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-white p-1.5 shadow-md border-2 border-primary/20 shrink-0 overflow-hidden flex items-center justify-center">
+              <img src="/logos/logo1white.jfif" alt="AMA BAKERY" className="h-full w-full object-contain" />
             </div>
-            <h1 className="text-lg font-black text-foreground -mt-1 tracking-tight">{title}</h1>
+            <h1 className="text-base lg:text-lg font-rockwell font-black text-slate-800 tracking-tight leading-none">AMA BAKERY</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {showNotification && (
-            <Button variant="ghost" size="icon" className="relative h-10 w-10">
+            <Button variant="ghost" size="icon" className="relative h-10 w-10 text-slate-500 hover:bg-slate-100">
               <Bell className="h-5 w-5" />
               {notificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-white text-[10px] flex items-center justify-center font-black">
                   {notificationCount}
                 </span>
               )}
@@ -83,9 +74,12 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl shadow-xl border-none p-2 animate-in fade-in zoom-in-95 duration-200">
-              <DropdownMenuLabel className="flex flex-col p-3">
-                <span className="font-black text-xs uppercase tracking-widest text-muted-foreground">{user?.role || "Staff"} Account</span>
-                <span className="text-sm font-bold text-foreground mt-1">{user?.name || "User"}</span>
+              <DropdownMenuLabel className="p-3">
+                <span className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground block mb-1">{userRole} Account</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-foreground">{userName}</span>
+                  <span className="text-[10px] text-slate-400 font-bold italic">{branchName}</span>
+                </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors active:scale-95">
@@ -97,13 +91,6 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
                 <span className="font-semibold">Help Support</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-slate-100" />
-              <DropdownMenuItem
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-destructive focus:bg-destructive/5 focus:text-destructive active:scale-95 transition-all"
-                onClick={logout}
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="font-bold">Logout</span>
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

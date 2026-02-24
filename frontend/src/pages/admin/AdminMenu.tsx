@@ -60,6 +60,7 @@ export default function AdminMenu() {
     const [newCategoryInput, setNewCategoryInput] = useState("");
     const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
     const [editingCategoryName, setEditingCategoryName] = useState("");
+    const [formAvailable, setFormAvailable] = useState(true);
 
     useEffect(() => {
         loadData();
@@ -100,10 +101,7 @@ export default function AdminMenu() {
             if (p) {
                 const payload = {
                     name: p.name,
-                    cost_price: p.cost_price,
                     selling_price: p.selling_price,
-                    product_quantity: p.product_quantity,
-                    low_stock_bar: p.low_stock_bar,
                     category: p.category,
                     is_available: !currentStatus
                 };
@@ -124,17 +122,14 @@ export default function AdminMenu() {
         setSubmitting(true);
         const formData = new FormData(e.currentTarget);
 
-        // Get switch value manually
-        const is_available = e.currentTarget.querySelector<HTMLButtonElement>('[role="switch"]')?.['aria-checked' as any] === 'true';
-
         const payload = {
             name: formData.get("name"),
-            cost_price: formData.get("cost_price"),
+            cost_price: "0.00",
             selling_price: formData.get("selling_price"),
-            product_quantity: parseInt(formData.get("product_quantity") as string),
-            low_stock_bar: parseInt(formData.get("low_stock_bar") as string),
+            product_quantity: 0,
+            low_stock_bar: 0,
             category: parseInt(formData.get("category") as string),
-            is_available: is_available !== undefined ? is_available : true
+            is_available: formAvailable
         };
 
         try {
@@ -165,7 +160,13 @@ export default function AdminMenu() {
             setProducts(prev => prev.filter(p => p.id !== productId));
             toast.success(data.message || "Item deleted");
         } catch (err: any) {
-            toast.error(err.message || "Delete failed");
+            // If the item is already gone (404), remove it from the list anyway
+            if (err.message?.includes("404") || err.message?.toLowerCase().includes("not found")) {
+                setProducts(prev => prev.filter(p => p.id !== productId));
+                toast.success("Item removed from list");
+            } else {
+                toast.error(err.message || "Delete failed");
+            }
         }
     };
 
@@ -229,7 +230,10 @@ export default function AdminMenu() {
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button size="sm" className="w-full sm:w-auto font-bold" onClick={() => setEditItem(null)}>
+                            <Button size="sm" className="w-full sm:w-auto font-bold" onClick={() => {
+                                setEditItem(null);
+                                setFormAvailable(true);
+                            }}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Item
                             </Button>
@@ -245,25 +249,9 @@ export default function AdminMenu() {
                                     <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Item Name</Label>
                                     <Input id="name" name="name" className="h-12 text-lg rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" placeholder="Enter item name" defaultValue={editItem?.name} required />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cost_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
-                                        <Input id="cost_price" name="cost_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.cost_price} required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="selling_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
-                                        <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 font-bold text-primary" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.selling_price} required />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="product_quantity" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Initial Stock</Label>
-                                        <Input id="product_quantity" name="product_quantity" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editItem?.product_quantity} required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="low_stock_bar" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
-                                        <Input id="low_stock_bar" name="low_stock_bar" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20" type="number" placeholder="0" defaultValue={editItem?.low_stock_bar} required />
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="selling_price" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                                    <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 font-bold text-primary" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.selling_price} required />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 items-end">
                                     <div className="space-y-2">
@@ -280,7 +268,11 @@ export default function AdminMenu() {
                                         </Select>
                                     </div>
                                     <div className="flex items-center space-x-3 pb-2.5 pl-2">
-                                        <Switch id="is_available" defaultChecked={editItem?.is_available ?? true} />
+                                        <Switch
+                                            id="is_available"
+                                            checked={formAvailable}
+                                            onCheckedChange={setFormAvailable}
+                                        />
                                         <Label htmlFor="is_available" className="text-sm font-bold text-slate-600">Available</Label>
                                     </div>
                                 </div>
@@ -314,33 +306,10 @@ export default function AdminMenu() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
-                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
-                                                {viewItem.cost_price}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
-                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary">
-                                                {viewItem.selling_price}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
-                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold">
-                                                {viewItem.product_quantity}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
-                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
-                                                {viewItem.low_stock_bar}
-                                            </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                                        <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary">
+                                            {viewItem.selling_price}
                                         </div>
                                     </div>
 
@@ -462,6 +431,7 @@ export default function AdminMenu() {
                                                 className="h-9 w-9 text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
                                                 onClick={() => {
                                                     setEditItem(item);
+                                                    setFormAvailable(item.is_available);
                                                     setIsDialogOpen(true);
                                                 }}
                                             >

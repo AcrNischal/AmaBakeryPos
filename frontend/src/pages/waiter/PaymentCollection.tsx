@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -7,135 +7,202 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
-import { sampleOrders, Order } from "@/lib/mockData";
-import { CreditCard, Banknote, Check, Users, CheckCircle2, IndianRupee, Receipt, Printer, MessageSquare, Clock, X } from "lucide-react";
+import { CreditCard, Banknote, CheckCircle2, IndianRupee, Printer, Clock, X, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { fetchInvoices, addPayment } from "@/api/index.js";
 
 export default function PaymentCollection() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>(
-    sampleOrders.filter(o => o.paymentStatus === 'pending')
-  );
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCashDialog, setShowCashDialog] = useState(false);
   const [cashReceived, setCashReceived] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [showOnlineDialog, setShowOnlineDialog] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState<any | null>(null);
   const [completedChange, setCompletedChange] = useState<number>(0);
 
-  const handlePayment = (method: 'cash' | 'online') => {
-    if (method === 'cash') {
-      setShowPaymentDialog(false);
-      setShowCashDialog(true);
-    } else {
-      processPayment('online');
+  useEffect(() => {
+    loadInvoices();
+  }, []);
+
+  const loadInvoices = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchInvoices();
+      // Filter for orders that are NOT fully paid yet
+      const pendingPayments = (data || []).filter(
+        (o: any) => o.payment_status !== "PAID" && o.invoice_status !== "CANCELLED"
+      );
+      setOrders(pendingPayments);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load pending payments");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const processPayment = async (method: string, change = 0) => {
+  const handlePaymentClick = (order: any) => {
+    setSelectedOrder(order);
+    setShowPaymentDialog(true);
+  };
+
+  const handlePaymentMethod = (method: 'CASH' | 'CARD' | 'ONLINE') => {
+    if (method === 'CASH') {
+      setShowPaymentDialog(false);
+      setShowCashDialog(true);
+    } else if (method === 'ONLINE') {
+      setShowPaymentDialog(false);
+      setShowOnlineDialog(true);
+    } else {
+      processPayment(method, parseFloat(selectedOrder.due_amount || selectedOrder.total_amount));
+    }
+  };
+
+  const processPayment = async (method: string, amount: number, change = 0) => {
     if (!selectedOrder) return;
 
     setIsProcessing(true);
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Logic for adding payment to backend
+      const paymentData = {
+        amount: amount,
+        payment_method: method,
+        notes: `Payment collected by waiter for Order #${selectedOrder.invoice_number}`
+      };
 
-    setOrders(prev => prev.filter(o => o.id !== selectedOrder.id));
+      await addPayment(selectedOrder.id, paymentData);
 
-    toast.success("Payment Received!", {
-      description: method === 'cash' && change > 0
-        ? `Change to return: Rs.${change.toFixed(2)}`
-        : `Table ${selectedOrder.tableNumber} - Rs.${selectedOrder.total} paid via ${method}`,
-      icon: <CheckCircle2 className="h-5 w-5 text-success" />
-    });
+      toast.success("Payment Received!", {
+        description: method === 'CASH' && change > 0
+          ? `Change to return: Rs.${change.toFixed(2)}`
+          : `Order #${selectedOrder.invoice_number?.slice(-4)} - Rs.${amount.toFixed(2)} paid via ${method}`,
+        icon: <CheckCircle2 className="h-5 w-5 text-success" />
+      });
 
-    setIsProcessing(false);
-    setShowPaymentDialog(false);
-    setShowCashDialog(false);
+      // Refresh list
+      await loadInvoices();
 
-    // Set completed order for receipt
-    setCompletedOrder({
-      ...selectedOrder,
-      paymentMethod: method as any,
-      paymentStatus: 'paid'
-    });
-    setCompletedChange(change);
-    setShowReceipt(true);
+      setShowPaymentDialog(false);
+      setShowCashDialog(false);
+      setShowOnlineDialog(false);
 
-    setSelectedOrder(null);
-    setCashReceived("");
+      // Set completed order for receipt display
+      setCompletedOrder({
+        ...selectedOrder,
+        payment_method: method,
+        payment_status: 'PAID'
+      });
+      setCompletedChange(change);
+      setShowReceipt(true);
+
+      setSelectedOrder(null);
+      setCashReceived("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process payment");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleCashPayment = () => {
+  const handleCashPaymentSubmit = () => {
     const received = parseFloat(cashReceived);
+    const due = parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0);
+
     if (!cashReceived || isNaN(received)) {
       toast.error("Please enter amount received");
       return;
     }
 
-    if (received < (selectedOrder?.total || 0)) {
+    if (received < due) {
       toast.error("Insufficient amount");
       return;
     }
 
-    const change = received - (selectedOrder?.total || 0);
-    processPayment('cash', change);
+    const change = received - due;
+    processPayment('CASH', due, change);
   };
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <MobileHeader title="Collect Payment" showBack />
+      <MobileHeader title="Payments" showBack={false} />
 
       <main className="p-4">
-        {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Check className="h-16 w-16 mb-4 text-success opacity-70" />
-            <h3 className="text-lg font-medium">All bills cleared!</h3>
-            <p className="text-sm">No pending payments</p>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+            <p className="text-muted-foreground animate-pulse">Fetching pending bills...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <div className="h-20 w-20 rounded-full bg-success/10 flex items-center justify-center mb-4">
+              <CheckCircle2 className="h-10 w-10 text-success" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">All sets!</h3>
+            <p className="text-sm">No pending payments found today.</p>
+            <Button
+              variant="outline"
+              className="mt-6 rounded-xl"
+              onClick={loadInvoices}
+            >
+              Refresh List
+            </Button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                {orders.length} Pending Bills
+              </p>
+              <Button variant="ghost" size="sm" onClick={loadInvoices} className="h-7 text-[10px] font-bold">
+                REFRESH
+              </Button>
+            </div>
+
             {orders.map((order) => (
               <button
                 key={order.id}
-                className="card-elevated p-4 w-full text-left hover:shadow-warm-lg transition-all"
-                onClick={() => {
-                  setSelectedOrder(order);
-                  setShowPaymentDialog(true);
-                }}
+                className="card-elevated w-full text-left overflow-hidden transition-all active:scale-[0.98]"
+                onClick={() => handlePaymentClick(order)}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-lg">Table {order.tableNumber}</span>
-                      {order.groupName && (
-                        <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">
-                          {order.groupName}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {order.items.length} items • {order.waiter}
-                    </p>
+                <div className="bg-slate-50/80 px-4 py-3 flex items-center justify-between border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base">Order #{order.invoice_number?.slice(-4) || '??'}</span>
+                    <span className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-slate-500">
+                      Table {order.table_no || order.floor_name || '??'}
+                    </span>
                   </div>
-                  <StatusBadge status={order.paymentStatus} />
+                  <StatusBadge status={order.invoice_status?.toLowerCase()} />
                 </div>
 
-                <div className="space-y-1 text-sm border-t pt-3">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between">
-                      <span>{item.quantity}× {item.menuItem.name}</span>
-                      <span>Rs.{item.menuItem.price * item.quantity}</span>
+                <div className="p-4">
+                  <div className="space-y-1 mb-3">
+                    {order.items?.slice(0, 3).map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm text-slate-600">
+                        <span>{item.quantity}× {item.product_name || 'Item'}</span>
+                        <span className="text-slate-400 tabular-nums">Rs.{Number(item.unit_price * item.quantity).toFixed(0)}</span>
+                      </div>
+                    ))}
+                    {order.items?.length > 3 && (
+                      <p className="text-[10px] text-muted-foreground">+ {order.items.length - 3} more items</p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-100">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+                      <User className="h-3.5 w-3.5" />
+                      <span className="font-medium">{order.created_by_name || 'Waiter'}</span>
                     </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-between items-center mt-3 pt-3 border-t">
-                  <span className="font-medium">Total</span>
-                  <span className="text-xl font-bold text-primary">Rs.{order.total}</span>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Amount Due</p>
+                      <p className="text-lg font-black text-primary leading-none">Rs.{Number(order.due_amount || order.total_amount).toFixed(2)}</p>
+                    </div>
+                  </div>
                 </div>
               </button>
             ))}
@@ -145,85 +212,88 @@ export default function PaymentCollection() {
 
       {/* Payment Method Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Collect Payment</DialogTitle>
-          </DialogHeader>
-
-          {selectedOrder && (
-            <div className="space-y-4">
-              <div className="text-center py-4 bg-muted/50 rounded-lg">
-                <p className="text-muted-foreground">Amount Due</p>
-                <p className="text-4xl font-bold text-primary">Rs.{selectedOrder.total}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Table {selectedOrder.tableNumber}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => handlePayment('cash')}
-                >
-                  <Banknote className="h-6 w-6 text-success" />
-                  <span>Cash</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => handlePayment('online')}
-                >
-                  <CreditCard className="h-6 w-6 text-info" />
-                  <span>Online</span>
-                </Button>
-              </div>
+        <DialogContent className="max-w-[calc(100%-2rem)] w-[360px] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-primary p-6 text-white text-center">
+            <div className="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3 border border-white/20">
+              <Wallet className="h-7 w-7 text-white" />
             </div>
-          )}
+            <h3 className="text-xl font-bold">Collect Payment</h3>
+            <p className="text-white/70 text-sm">Order #{selectedOrder?.invoice_number?.slice(-4)}</p>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="text-center py-6 bg-slate-50 rounded-2xl border-2 border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Total Bill Amount</p>
+              <p className="text-4xl font-black text-primary">Rs.{Number(selectedOrder?.due_amount || selectedOrder?.total_amount || 0).toFixed(2)}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="h-24 flex-col gap-2 rounded-2xl border-2 hover:border-success hover:bg-success/5 hover:text-success transition-all group"
+                onClick={() => handlePaymentMethod('CASH')}
+              >
+                <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-success/20">
+                  <Banknote className="h-6 w-6 text-slate-400 group-hover:text-success" />
+                </div>
+                <span className="font-bold">Cash</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-24 flex-col gap-2 rounded-2xl border-2 hover:border-info hover:bg-info/5 hover:text-info transition-all group"
+                onClick={() => handlePaymentMethod('ONLINE')}
+              >
+                <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-info/20">
+                  <CreditCard className="h-6 w-6 text-slate-400 group-hover:text-info" />
+                </div>
+                <span className="font-bold">Online</span>
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Cash Payment Dialog - Added this as requested */}
+      {/* Cash Payment Dialog */}
       <Dialog open={showCashDialog} onOpenChange={setShowCashDialog}>
         <DialogContent className="max-w-[calc(100%-2rem)] w-[380px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-success p-6 text-white text-center">
+          <div className="bg-emerald-600 p-6 text-white text-center">
             <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4 border border-white/30">
               <Banknote className="h-8 w-8 text-white" />
             </div>
-            <h3 className="text-xl font-bold">Cash Collection</h3>
-            <p className="text-white/80 text-sm">Table {selectedOrder?.tableNumber}</p>
+            <h3 className="text-xl font-bold font-serif italic">Cash Collection</h3>
+            <p className="text-white/80 text-sm italic">Table {selectedOrder?.table_no}</p>
           </div>
 
           <div className="p-6 space-y-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
-                <span className="text-muted-foreground font-medium">Total Bill</span>
-                <span className="text-xl font-black text-primary">Rs.{selectedOrder?.total.toFixed(2)}</span>
+                <span className="text-muted-foreground font-medium text-sm">Amount Due</span>
+                <span className="text-xl font-black text-slate-900 tabular-nums">Rs.{Number(selectedOrder?.due_amount || selectedOrder?.total_amount || 0).toFixed(2)}</span>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Amount Received</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Cash Received</Label>
                 <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground text-xl">Rs.</div>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-300 text-xl">Rs.</div>
                   <Input
                     type="number"
                     placeholder="0.00"
                     value={cashReceived}
                     onChange={(e) => setCashReceived(e.target.value)}
-                    className="text-center text-3xl h-16 font-black border-2 border-success/20 focus:border-success pl-8 rounded-xl shadow-inner bg-slate-50"
+                    className="text-center text-3xl h-16 font-black border-2 border-slate-100 focus:border-emerald-500 pl-8 rounded-xl bg-slate-50"
                     autoFocus
                   />
                 </div>
               </div>
 
-              {cashReceived && parseFloat(cashReceived) >= (selectedOrder?.total || 0) && (
-                <div className="p-4 rounded-xl bg-success/10 border-2 border-success/20 text-success animate-in zoom-in-95 duration-300 shadow-sm">
+              {cashReceived && parseFloat(cashReceived) >= parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0) && (
+                <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-100 text-emerald-700 animate-in zoom-in-95 duration-300">
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Change to Return</p>
-                      <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - (selectedOrder?.total || 0)).toFixed(2)}</p>
+                      <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0)).toFixed(2)}</p>
                     </div>
-                    <div className="h-12 w-12 rounded-full bg-success/20 flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
                       <IndianRupee className="h-6 w-6" />
                     </div>
                   </div>
@@ -234,23 +304,23 @@ export default function PaymentCollection() {
             <div className="flex gap-3">
               <Button
                 variant="ghost"
-                className="flex-1 h-14 font-bold text-muted-foreground"
+                className="flex-1 h-14 font-bold text-slate-400"
                 onClick={() => setShowCashDialog(false)}
                 disabled={isProcessing}
               >
                 Cancel
               </Button>
               <Button
-                className="flex-[1.5] h-14 text-lg font-bold gradient-warm shadow-lg"
-                onClick={handleCashPayment}
-                disabled={isProcessing || !cashReceived || parseFloat(cashReceived) < (selectedOrder?.total || 0)}
+                className="flex-[1.5] h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 shadow-lg rounded-xl"
+                onClick={handleCashPaymentSubmit}
+                disabled={isProcessing || !cashReceived || parseFloat(cashReceived) < parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0)}
               >
                 {isProcessing ? (
-                  <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
                   <>
                     <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Receive Cash
+                    Confirm Payment
                   </>
                 )}
               </Button>
@@ -259,142 +329,137 @@ export default function PaymentCollection() {
         </DialogContent>
       </Dialog>
 
-      {/* Digital Receipt Modal */}
-      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="max-w-[360px] w-[92vw] p-0 border-none bg-transparent shadow-none overflow-visible max-h-[92vh] flex flex-col">
-          <div className="flex justify-end mb-2">
-            <button
-              onClick={() => setShowReceipt(false)}
-              className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-900/80 text-white backdrop-blur-sm shadow-xl z-50 transition-all active:scale-95"
-            >
-              <X className="h-6 w-6" />
-            </button>
+      {/* Online Payment (QR) Dialog */}
+      <Dialog open={showOnlineDialog} onOpenChange={setShowOnlineDialog}>
+        <DialogContent className="max-w-[calc(100%-2rem)] w-[380px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-info p-6 text-white text-center">
+            <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4 border border-white/30">
+              <CreditCard className="h-8 w-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold">Online Payment</h3>
+            <p className="text-white/80 text-sm italic">Scan QR to pay • Table {selectedOrder?.table_no}</p>
           </div>
 
-          <div className="bg-white rounded-[2rem] overflow-y-auto shadow-2xl relative">
-            <div className="h-2 bg-primary w-full sticky top-0 z-10" />
+          <div className="p-8 space-y-6 flex flex-col items-center">
+            <div className="text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Payable Amount</p>
+              <p className="text-3xl font-black text-primary mb-6">Rs.{Number(selectedOrder?.due_amount || selectedOrder?.total_amount || 0).toFixed(2)}</p>
+            </div>
 
-            {completedOrder && (
-              <div className="p-8 space-y-6">
-                {/* Logo & Info */}
-                <div className="text-center space-y-3">
-                  <div className="mx-auto h-20 w-20 p-1 bg-white rounded-2xl shadow-sm border border-slate-50 overflow-hidden">
-                    <img src="/logos/logo1white.jfif" alt="Logo" className="h-full w-full object-cover" />
-                  </div>
-                  <div className="space-y-1">
-                    <h1 className="text-2xl font-black tracking-tight text-primary">AMA BAKERY</h1>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Artisanal & Fresh Daily</p>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-medium">
-                    <p>123 Bakery Street, Kathmandu</p>
-                    <p>Phone: +977 9800000000</p>
-                  </div>
-                </div>
-
-                <Separator className="bg-slate-100" />
-
-                {/* Order Details */}
-                <div className="grid grid-cols-2 gap-y-3 text-[12px]">
-                  <div className="space-y-1">
-                    <p className="text-slate-400 font-bold uppercase text-[9px]">Order Date</p>
-                    <p className="font-bold">{new Date(completedOrder.createdAt).toLocaleDateString()} {new Date(completedOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-slate-400 font-bold uppercase text-[9px]">Table / Group</p>
-                    <p className="font-bold">Table {completedOrder.tableNumber} {completedOrder.groupName ? `(${completedOrder.groupName})` : ''}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-slate-400 font-bold uppercase text-[9px]">Waiter</p>
-                    <p className="font-bold">{completedOrder.waiter}</p>
-                  </div>
-                  <div className="flex flex-col items-end space-y-1">
-                    <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest text-right">Status</p>
-                    <p className="font-black uppercase text-[10px] px-3 py-1 rounded-full whitespace-nowrap bg-emerald-100 text-emerald-600">
-                      Paid
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-[1px] flex-1 bg-slate-100" />
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Items List</span>
-                    <div className="h-[1px] flex-1 bg-slate-100" />
-                  </div>
-
-                  {/* Items */}
-                  <div className="space-y-3">
-                    {completedOrder.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-start gap-4 text-sm font-medium">
-                        <div className="flex-1">
-                          <p className="text-slate-800 leading-tight">{item.menuItem.name}</p>
-                          <p className="text-[10px] text-slate-400">{item.quantity} x Rs.{item.menuItem.price}</p>
-                        </div>
-                        <p className="text-slate-800 font-bold whitespace-nowrap">Rs.{(item.menuItem.price * item.quantity).toFixed(2)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator className="bg-slate-100" />
-
-                {/* Totals */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-slate-500 font-medium">
-                    <span>Subtotal</span>
-                    <span>Rs.{(completedOrder.total / 1.05).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-slate-500 font-medium">
-                    <span>Tax (5%)</span>
-                    <span>Rs.{(completedOrder.total - (completedOrder.total / 1.05)).toFixed(2)}</span>
-                  </div>
-                  {completedChange > 0 && (
-                    <div className="flex justify-between text-sm text-success font-bold">
-                      <span>Change Given</span>
-                      <span>Rs.{completedChange.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="pt-2 flex justify-between items-center">
-                    <span className="text-lg font-black text-slate-900 leading-none">Total</span>
-                    <span className="text-2xl font-black text-primary leading-none">Rs.{completedOrder.total.toFixed(2)}</span>
-                  </div>
-                  {completedOrder.paymentMethod && (
-                    <div className="text-center pt-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                        Paid via {completedOrder.paymentMethod}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="pt-6 space-y-4 text-center">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-medium italic">Thank you for visiting Ama Bakery!</p>
-                  </div>
-                  <Button
-                    className="w-full h-12 bg-slate-900 text-white font-bold rounded-xl shadow-lg"
-                    onClick={() => window.print()}
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Download / Print Bill
-                  </Button>
-                </div>
+            {/* QR Code Placeholder/Real */}
+            <div className="relative p-4 bg-white rounded-[2rem] border-4 border-slate-50 shadow-inner group">
+              <div className="h-48 w-48 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
+                <img
+                  src="/logos/qr.png"
+                  alt="QR Code"
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=AMABAKERY_PAYMENT";
+                  }}
+                />
               </div>
-            )}
+              <div className="absolute -top-2 -right-2 h-8 w-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                <div className="h-4 w-4 rounded-full border-2 border-white animate-ping absolute" />
+                <IndianRupee className="h-4 w-4 relative" />
+              </div>
+            </div>
 
-            {/* Receipt Zig Zag Bottom */}
-            <div className="flex w-full overflow-hidden h-2">
-              {[...Array(20)].map((_, i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 shrink-0 -translate-y-1" />
-              ))}
+            <div className="text-center max-w-[240px]">
+              <p className="text-xs font-semibold text-slate-500">Please ask the customer to scan and pay the exact amount above</p>
+            </div>
+
+            <div className="w-full space-y-3 pt-2">
+              <Button
+                className="w-full h-14 bg-info hover:bg-info/90 text-white font-black rounded-2xl shadow-xl shadow-info/20"
+                onClick={() => processPayment('ONLINE', parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0))}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Confirm & Complete Order
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full h-12 text-slate-400 font-bold"
+                onClick={() => setShowOnlineDialog(false)}
+                disabled={isProcessing}
+              >
+                Go Back
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Bottom Navigation */}
+      {/* Digital Receipt Modal (Reuse your professional receipt logic here) */}
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+        <DialogContent className="max-w-[360px] w-[92vw] p-0 border-none bg-transparent shadow-none overflow-visible max-h-[92vh] flex flex-col items-center">
+          <div className="h-[2px] w-24 bg-white/20 rounded-full mb-4 shrink-0" />
+
+          {/* The Actual Receipt */}
+          <div className="bg-white w-full rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="h-1.5 bg-primary w-full" />
+
+            <div className="p-6 space-y-4">
+              <div className="text-center">
+                <h1 className="text-lg text-primary font-black tracking-widest" style={{ fontFamily: "'Rockwell', serif" }}>AMA BAKERY</h1>
+                <p className="text-[8px] text-slate-400 uppercase tracking-widest mt-1">Payment Successful</p>
+              </div>
+
+              <div className="border-t border-b border-dashed py-3 flex justify-between items-center text-[11px]">
+                <div>
+                  <p className="text-slate-400 font-bold uppercase text-[8px]">Receipt</p>
+                  <p className="font-bold">#{(completedOrder?.id || '0').toString().padStart(4, '0')}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-400 font-bold uppercase text-[8px]">Method</p>
+                  <p className="font-bold">{completedOrder?.payment_method}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Order Total</span>
+                  <span className="font-bold">Rs.{Number(completedOrder?.total_amount).toFixed(2)}</span>
+                </div>
+                {completedChange > 0 && (
+                  <div className="flex justify-between text-xs text-emerald-600">
+                    <span>Change Given</span>
+                    <span className="font-black">Rs.{completedChange.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100">
+              <Button
+                className="w-full bg-slate-900 text-white font-bold h-11 rounded-xl"
+                onClick={() => setShowReceipt(false)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <WaiterBottomNav />
     </div>
   );
+}
+
+// Simple Helper Component
+function User({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  )
 }

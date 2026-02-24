@@ -20,7 +20,6 @@ const navItems = [
   { icon: Monitor, label: "POS Terminal", path: "/counter/pos" },
   { icon: ClipboardList, label: "Orders", path: "/admin/dashboard/orders" },
   { icon: UtensilsCrossed, label: "Menu", path: "/admin/dashboard/menu" },
-  { icon: Package, label: "Inventory", path: "/admin/dashboard/inventory" },
   { icon: Users, label: "Customers", path: "/admin/dashboard/customers" },
   { icon: ChefHat, label: "Staff", path: "/admin/dashboard/users" },
   { icon: FileBarChart, label: "Reports", path: "/admin/dashboard/reports" },
@@ -44,11 +43,11 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
     <div className={cn("flex h-full flex-col gradient-espresso text-sidebar-foreground", className)}>
       {/* Logo */}
       <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden border border-white/20">
-          <img src="/logos/logo2brown.jpeg" alt="Ama Bakery" className="h-full w-full object-cover" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden border border-white/20">
+          <img src="/logos/logo2brown.jpeg" alt="AMA BAKERY" className="h-full w-full object-cover" />
         </div>
         <div>
-          <h1 className="font-bold text-lg leading-none mb-1">Ama Bakery</h1>
+          <h1 className="font-rockwell font-bold text-lg leading-none mb-1">AMA BAKERY</h1>
           <p className="text-[10px] text-sidebar-foreground font-black uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded-sm inline-block">
             {branchName}
           </p>
@@ -80,17 +79,6 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           );
         })}
       </nav>
-
-      {/* Logout */}
-      <div className="border-t border-sidebar-border p-3">
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all text-left"
-        >
-          <LogOut className="h-5 w-5" />
-          Logout
-        </button>
-      </div>
     </div>
   );
 }

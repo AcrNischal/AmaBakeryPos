@@ -39,37 +39,30 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove, onSetQuantity }:
   };
   return (
     <div className={cn(
-      "p-4 flex items-center justify-between gap-4 transition-all duration-200 rounded-xl",
+      "p-4 flex items-center justify-between gap-4 transition-all duration-200 border rounded-2xl",
       !item.available && "opacity-50",
       quantity > 0
-        ? "border-2 border-primary bg-primary/[0.03] shadow-sm"
-        : "border border-slate-200 bg-white shadow-none"
+        ? "border-primary bg-primary/[0.02] shadow-sm"
+        : "border-slate-100 bg-white"
     )}>
       <div className="flex-1 min-w-0">
         <div
-          className="flex items-start gap-3 cursor-pointer group/info"
+          className="flex items-center gap-4 cursor-pointer"
           onClick={() => setShowQtyDialog(true)}
         >
           {/* Icon placeholder */}
           <div className={cn(
-            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-            quantity > 0 ? "bg-primary/20 text-primary" : "bg-slate-100 text-slate-400"
+            "h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 border transition-all",
+            quantity > 0 ? "bg-primary/10 border-primary/20 text-primary" : "bg-slate-50 border-slate-100 text-slate-400"
           )}>
-            <ShoppingBag className="h-6 w-6" />
+            <ShoppingBag className="h-7 w-7" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-slate-800 truncate text-lg transition-colors">{item.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-primary font-black text-lg font-mono">Rs.{item.price}</p>
-              {quantity > 0 && (
-                <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
-                  {quantity} Added
-                </span>
-              )}
-            </div>
+            <h3 className="font-bold text-slate-800 truncate text-lg">{item.name}</h3>
+            <p className="text-primary font-black text-xl leading-none mt-1">Rs.{item.price}</p>
             {!item.available && (
-              <span className="text-[10px] text-destructive font-black bg-destructive/10 px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider">
+              <span className="text-[10px] text-destructive font-black bg-destructive/10 px-2 py-0.5 rounded-full inline-block mt-2 uppercase tracking-wider">
                 Out of stock
               </span>
             )}
@@ -78,53 +71,43 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove, onSetQuantity }:
       </div>
 
       {item.available && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="shrink-0">
           {quantity > 0 ? (
-            <>
+            <div className="flex items-center bg-white rounded-xl border border-primary/20 p-1 shadow-sm">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-full border-2 transition-all"
+                className="h-8 w-8 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/5"
                 onClick={() => onRemove(item)}
               >
-                <Minus className="h-5 w-5" />
+                <Minus className="h-4 w-4" />
               </Button>
+
               <button
                 onClick={() => setShowQtyDialog(true)}
-                className="min-w-[40px] px-1 flex flex-col items-center justify-center group relative pt-1"
+                className="px-3 h-8 flex flex-col items-center justify-center min-w-[40px]"
               >
-                <div className="relative">
-                  <span className="text-[9px] font-black text-primary/60 transition-colors block leading-none">Qty</span>
-                  <div className="flex items-center justify-center gap-0.5">
-                    <span className="text-lg font-black text-slate-800 leading-none">{quantity}</span>
-                    <Pencil className="h-2.5 w-2.5 text-primary/40" />
-                  </div>
-                </div>
+                <span className="text-[9px] font-black text-primary/60 uppercase leading-none">Qty</span>
+                <span className="text-base font-black text-slate-800 leading-none">{quantity}</span>
               </button>
+
               <Button
+                variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-full gradient-warm shadow-lg transition-all"
+                className="h-8 w-8 rounded-lg text-primary hover:bg-primary/5"
                 onClick={() => onAdd(item)}
               >
-                <Plus className="h-5 w-5" />
-              </Button>
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowQtyDialog(true)}
-                className="h-9 px-3 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold tracking-tight text-slate-500 transition-all active:scale-95"
-              >
-                Qty
-              </button>
-              <Button
-                size="icon"
-                className="h-12 w-12 rounded-full gradient-warm shadow-lg transition-all"
-                onClick={() => onAdd(item)}
-              >
-                <Plus className="h-6 w-6" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
+          ) : (
+            <Button
+              size="icon"
+              className="h-12 w-12 rounded-2xl gradient-warm shadow-lg shadow-primary/20 active:scale-95 transition-all"
+              onClick={() => onAdd(item)}
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
           )}
         </div>
       )}

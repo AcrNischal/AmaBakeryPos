@@ -43,6 +43,7 @@ interface CheckoutState {
     cart: CartItemData[];
     tableNumber: string;
     groupName?: string;
+    floorId?: string;
 }
 
 type PaymentTiming = "now" | "later" | null;
@@ -59,7 +60,7 @@ export default function Checkout() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>(null);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
-    const [taxEnabled, setTaxEnabled] = useState(true);
+    const [taxEnabled, setTaxEnabled] = useState(false);
     const [taxRate, setTaxRate] = useState(5);
     const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
@@ -90,6 +91,129 @@ export default function Checkout() {
         [subtotal, taxAmount, discountAmount]
     );
 
+    const handlePrint = () => {
+        const itemRows = state?.cart.map(item => `
+            <tr>
+                <td style="padding:8px 4px;border-bottom:1px solid #f1f5f9;">
+                    <div style="font-weight:800;font-size:12px;color:#1e293b;">${item.item.name}</div>
+                    ${item.notes ? `<div style="font-size:10px;color:#a78bfa;font-style:italic;">"${item.notes}"</div>` : ''}
+                </td>
+                <td style="padding:8px 4px;border-bottom:1px solid #f1f5f9;text-align:center;font-size:12px;color:#64748b;font-weight:600;">x${item.quantity}</td>
+                <td style="padding:8px 4px;border-bottom:1px solid #f1f5f9;text-align:right;font-size:12px;font-weight:800;color:#1e293b;">Rs.${(item.item.price * item.quantity).toFixed(2)}</td>
+            </tr>
+        `).join('') || '';
+
+        const taxRow = taxAmount > 0 ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:11px;color:#64748b;font-weight:600;">Tax (${taxRate}%)</span>
+                <span style="font-size:11px;color:#64748b;font-weight:600;">Rs.${taxAmount.toFixed(2)}</span>
+            </div>` : '';
+
+        const discountRow = discountAmount > 0 ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:11px;color:#10b981;font-weight:700;">Discount (${discountPercent}%)</span>
+                <span style="font-size:11px;color:#10b981;font-weight:700;">-Rs.${discountAmount.toFixed(2)}</span>
+            </div>` : '';
+
+        const customerRow = customer ? `
+            <div style="grid-column:1/-1;border-top:1px solid #f8fafc;padding-top:6px;margin-top:2px;">
+                <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Customer</div>
+                <div style="font-size:11px;font-weight:800;color:#ca8a04;">${customer.name} <span style="color:#94a3b8;font-weight:400;">${customer.phone}</span></div>
+            </div>` : '';
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <title>Receipt - Ama Bakery</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#fff; }
+        @media print {
+            @page { size: 80mm auto; margin: 4mm; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+<div style="width:100%;max-width:72mm;margin:0 auto;padding:8px;">
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:16px;">
+        <img src="/logos/logo1white.jfif" style="width:72px;height:72px;border-radius:50%;object-fit:contain;border:2px solid #fde68a;margin-bottom:8px;"/>
+        <div style="font-size:20px;font-weight:900;color:#ca8a04;letter-spacing:0.05em;">AMA BAKERY</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:3px 0;">
+            <span style="display:inline-block;height:1px;width:16px;background:#fde68a;"></span>
+            <span style="font-size:8px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;">Freshly Baked Daily</span>
+            <span style="display:inline-block;height:1px;width:16px;background:#fde68a;"></span>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;font-weight:600;line-height:1.6;margin-top:4px;">
+            123 Bakery Street, Kathmandu<br/>+977 9800000000
+        </div>
+    </div>
+
+    <!-- Order Info -->
+    <div style="border-top:1px dashed #cbd5e1;border-bottom:1px dashed #cbd5e1;padding:10px 0;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+            <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Order Receipt</div>
+            <div style="font-size:11px;font-weight:800;color:#1e293b;">#${orderId ? String(orderId).slice(-6).toUpperCase() : 'NEW'}</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Date &amp; Time</div>
+            <div style="font-size:10px;font-weight:700;color:#1e293b;">${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
+        <div>
+            <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Serving Location</div>
+            <div style="font-size:11px;font-weight:800;color:#1e293b;">Table ${state?.tableNumber}</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Payment Status</div>
+            <div style="display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 8px;border-radius:999px;${paymentTiming === 'now' ? 'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;' : 'background:#fffbeb;color:#d97706;border:1px solid #fde68a;'}">${paymentTiming === 'now' ? 'Paid' : 'Due Later'}</div>
+        </div>
+        ${customerRow}
+    </div>
+
+    <!-- Items -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+        <thead>
+            <tr>
+                <th style="text-align:left;padding:6px 4px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">Item</th>
+                <th style="text-align:center;padding:6px 4px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">Qty</th>
+                <th style="text-align:right;padding:6px 4px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">Price</th>
+            </tr>
+        </thead>
+        <tbody>${itemRows}</tbody>
+    </table>
+
+    <!-- Totals -->
+    <div style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;padding:14px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:11px;color:#64748b;font-weight:600;">Subtotal</span>
+            <span style="font-size:11px;color:#64748b;font-weight:600;">Rs.${subtotal.toFixed(2)}</span>
+        </div>
+        ${taxRow}
+        ${discountRow}
+        <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:0.05em;">Total Amount</span>
+            <span style="font-size:22px;font-weight:900;color:#ca8a04;line-height:1;">Rs.${total.toFixed(2)}</span>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center;border:1px dashed #e2e8f0;border-radius:8px;padding:8px;">
+        <p style="font-size:10px;color:#94a3b8;font-style:italic;">Thank you for visiting Ama Bakery!</p>
+    </div>
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
+</body>
+</html>`;
+
+        const win = window.open('', '_blank', 'width=400,height=700');
+        if (win) {
+            win.document.write(html);
+            win.document.close();
+        }
+    };
+
     const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0) => {
         setIsProcessing(true);
         const user = getCurrentUser();
@@ -100,7 +224,7 @@ export default function Checkout() {
                 customer: customer?.id || null,
                 invoice_type: "SALE",
                 notes: specialInstructions,
-                invoice_description: `Table ${state?.tableNumber} - ${state?.groupName || "Walk-in"}`,
+                description: `Table ${state?.tableNumber} - ${state?.groupName || "Walk-in"}`,
                 floor: state?.floorId ? parseInt(state.floorId) : null,
                 tax_amount: taxAmount,
                 discount: discountAmount,
@@ -115,7 +239,7 @@ export default function Checkout() {
             };
 
             const result = await createInvoice(invoiceData);
-            setOrderId(result.id); // Assuming ID is returned
+            setOrderId(String(result.id)); // Ensure ID is a string
 
             // Clear the order from storage
             clearTableOrder(state?.tableNumber || "", state?.groupName);
@@ -297,7 +421,40 @@ export default function Checkout() {
                 {/* Digital Receipt Modal */}
                 <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
                     <DialogContent className="max-w-[360px] w-[92vw] p-0 border-none bg-transparent shadow-none overflow-visible max-h-[92vh] flex flex-col">
-                        <div className="flex justify-end mb-2">
+                        <DialogTitle className="sr-only">Digital Receipt</DialogTitle>
+                        <style dangerouslySetInnerHTML={{
+                            __html: `
+                            @media print {
+                                @page {
+                                    size: 80mm auto;
+                                    margin: 5mm;
+                                }
+                                html, body {
+                                    height: auto !important;
+                                    overflow: visible !important;
+                                }
+                                body * {
+                                    visibility: hidden !important;
+                                }
+                                #bill-print-root, #bill-print-root * {
+                                    visibility: visible !important;
+                                }
+                                #bill-print-root {
+                                    position: absolute !important;
+                                    top: 0 !important;
+                                    left: 0 !important;
+                                    width: 100% !important;
+                                    height: auto !important;
+                                    overflow: visible !important;
+                                    box-shadow: none !important;
+                                    border-radius: 0 !important;
+                                }
+                                .no-print {
+                                    display: none !important;
+                                }
+                            }
+                        `}} />
+                        <div className="flex justify-end mb-2 no-print">
                             <button
                                 onClick={() => setShowReceipt(false)}
                                 className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-900/80 text-white backdrop-blur-sm shadow-xl z-50 transition-all active:scale-95"
@@ -306,125 +463,128 @@ export default function Checkout() {
                             </button>
                         </div>
 
-                        <div className="bg-white rounded-[2rem] overflow-y-auto shadow-2xl relative">
-                            <div className="h-2 bg-primary w-full sticky top-0 z-10" />
+                        <div className="bg-white rounded-2xl overflow-y-auto shadow-2xl relative custom-scrollbar" style={{ overflowY: 'auto' }}>
+                            <div id="bill-print-root">
+                                <div className="h-1.5 bg-primary w-full rounded-t-2xl" />
 
-                            <div className="p-8 space-y-6">
-                                {/* Logo & Info */}
-                                <div className="text-center space-y-3">
-                                    <div className="mx-auto h-20 w-20 p-1 bg-white rounded-2xl shadow-sm border border-slate-50 overflow-hidden">
-                                        <img src="/logos/logo1white.jfif" alt="Logo" className="h-full w-full object-cover" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h1 className="text-2xl font-black tracking-tight text-primary">AMA BAKERY</h1>
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">Artisanal & Fresh Daily</p>
-                                    </div>
-                                    <div className="text-[11px] text-slate-500 font-medium">
-                                        <p>123 Bakery Street, Kathmandu</p>
-                                        <p>Phone: +977 9800000000</p>
-                                    </div>
-                                </div>
-
-                                <Separator className="bg-slate-100" />
-
-                                {/* Order Details */}
-                                <div className="grid grid-cols-2 gap-y-3 text-[12px]">
-                                    <div className="space-y-1">
-                                        <p className="text-slate-400 font-bold uppercase text-[9px]">Order Date</p>
-                                        <p className="font-bold">{new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    </div>
-                                    <div className="space-y-1 text-right">
-                                        <p className="text-slate-400 font-bold uppercase text-[9px]">Table / Group</p>
-                                        <p className="font-bold">Table {state?.tableNumber} {state?.groupName ? `(${state.groupName})` : ''}</p>
-                                    </div>
-                                    {customer ? (
-                                        <div className="space-y-1">
-                                            <p className="text-slate-400 font-bold uppercase text-[9px]">Customer</p>
-                                            <p className="font-bold truncate">{customer.name}</p>
+                                <div className="px-5 pt-4 pb-2 space-y-3">
+                                    {/* Logo & Info */}
+                                    <div className="text-center space-y-1">
+                                        <div className="mx-auto h-14 w-14 p-1 bg-white rounded-full border-2 border-primary/10 flex items-center justify-center overflow-hidden">
+                                            <img src="/logos/logo1white.jfif" alt="Logo" className="h-full w-full object-contain" />
                                         </div>
-                                    ) : (
-                                        <div className="invisible" />
-                                    )}
-                                    <div className="flex flex-col items-end space-y-1">
-                                        <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest text-right">Status</p>
-                                        <p className={cn(
-                                            "font-black uppercase text-[10px] px-3 py-1 rounded-full whitespace-nowrap",
-                                            paymentTiming === 'now' ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
-                                        )}>
-                                            {paymentTiming === 'now' ? 'Paid' : 'Unpaid'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-[1px] flex-1 bg-slate-100" />
-                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Items List</span>
-                                        <div className="h-[1px] flex-1 bg-slate-100" />
-                                    </div>
-
-                                    {/* Items */}
-                                    <div className="space-y-3">
-                                        {state?.cart.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-start gap-4 text-sm font-medium">
-                                                <div className="flex-1">
-                                                    <p className="text-slate-800 leading-tight">{item.item.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{item.quantity} x Rs.{item.item.price}</p>
-                                                </div>
-                                                <p className="text-slate-800 font-bold whitespace-nowrap">Rs.{(item.item.price * item.quantity).toFixed(2)}</p>
+                                        <div>
+                                            <h1
+                                                className="text-lg text-primary leading-tight tracking-widest"
+                                                style={{ fontFamily: "'Rockwell', 'Rockwell Nova', 'Roboto Slab', 'Georgia', serif", fontWeight: 700 }}
+                                            >
+                                                AMA BAKERY
+                                            </h1>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <span className="h-[1px] w-3 bg-primary/20" />
+                                                <p className="text-[8px] text-slate-500 uppercase tracking-[0.2em] font-black">Freshly Baked Daily</p>
+                                                <span className="h-[1px] w-3 bg-primary/20" />
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <Separator className="bg-slate-100" />
-
-                                {/* Totals */}
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm text-slate-500 font-medium">
-                                        <span>Subtotal</span>
-                                        <span>Rs.{subtotal.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm text-slate-500 font-medium">
-                                        <span>Tax ({taxRate}%)</span>
-                                        <span>Rs.{taxAmount.toFixed(2)}</span>
-                                    </div>
-                                    {discountAmount > 0 && (
-                                        <div className="flex justify-between text-sm text-success font-bold">
-                                            <span>Discount ({discountPercent}%)</span>
-                                            <span>-Rs.{discountAmount.toFixed(2)}</span>
                                         </div>
-                                    )}
-                                    <div className="pt-2 flex justify-between items-center">
-                                        <span className="text-lg font-black text-slate-900 leading-none">Total</span>
-                                        <span className="text-2xl font-black text-primary leading-none">Rs.{total.toFixed(2)}</span>
+                                        <div className="text-[10px] text-slate-400 font-medium leading-tight">
+                                            <p>123 Bakery Street, Kathmandu • +977 9800000000</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-b border-dashed py-2 grid grid-cols-2 gap-y-2 text-[10px]">
+                                        <div>
+                                            <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Order Receipt</p>
+                                            <p className="font-black text-slate-800">#{orderId ? String(orderId).slice(-6).toUpperCase() : "NEW-ORDER"}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Date & Time</p>
+                                            <p className="font-bold text-slate-800">{new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Serving Location</p>
+                                            <p className="font-black text-slate-800">Table {state?.tableNumber}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Payment Status</p>
+                                            <p className={cn(
+                                                "font-black uppercase text-[8px] px-2 py-0.5 rounded-full inline-block",
+                                                paymentTiming === 'now' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-amber-50 text-amber-600 border border-amber-100"
+                                            )}>
+                                                {paymentTiming === 'now' ? 'Paid' : 'Due Later'}
+                                            </p>
+                                        </div>
+                                        {customer && (
+                                            <div className="col-span-2 border-t border-slate-50 pt-1.5">
+                                                <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Customer</p>
+                                                <p className="font-black text-primary text-[10px]">{customer.name} <span className="text-slate-400 font-medium ml-1">{customer.phone}</span></p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <table className="w-full text-[11px]">
+                                        <thead>
+                                            <tr className="border-b border-slate-100">
+                                                <th className="text-left py-1.5 font-black text-slate-400 uppercase text-[8px]">Item</th>
+                                                <th className="text-center py-1.5 font-black text-slate-400 uppercase text-[8px]">Qty</th>
+                                                <th className="text-right py-1.5 font-black text-slate-400 uppercase text-[8px]">Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {state?.cart.map((item, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="py-1.5 pr-2">
+                                                        <p className="font-bold text-slate-800 leading-tight">{item.item.name}</p>
+                                                        {item.notes && <p className="text-[9px] text-primary italic">"{item.notes}"</p>}
+                                                    </td>
+                                                    <td className="py-1.5 text-center text-slate-500">x{item.quantity}</td>
+                                                    <td className="py-1.5 text-right font-semibold text-slate-700">Rs.{(item.item.price * item.quantity).toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+
+                                    {/* Totals Section — professional receipt style */}
+                                    <div className="border-t border-slate-200 pt-2 space-y-1">
+                                        <div className="flex justify-between text-[11px] text-slate-500">
+                                            <span>Subtotal</span>
+                                            <span className="tabular-nums">Rs.{subtotal.toFixed(2)}</span>
+                                        </div>
+                                        {taxAmount > 0 && (
+                                            <div className="flex justify-between text-[11px] text-slate-500">
+                                                <span>Tax ({taxRate}%)</span>
+                                                <span className="tabular-nums">Rs.{taxAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {discountAmount > 0 && (
+                                            <div className="flex justify-between text-[11px] text-emerald-600">
+                                                <span>Discount ({discountPercent}%)</span>
+                                                <span className="tabular-nums">-Rs.{discountAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between items-center border-t border-dashed border-slate-300 pt-1.5 mt-1">
+                                            <span className="text-[12px] font-black text-slate-900 uppercase tracking-wide">Total</span>
+                                            <span className="text-[13px] font-black text-primary tabular-nums">Rs.{total.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Footer + Print */}
+                                    <div className="space-y-2 text-center pb-1">
+                                        <p className="text-[9px] text-slate-400 font-medium italic">Thank you for visiting Ama Bakery!</p>
+                                        <Button
+                                            className="w-full h-10 bg-slate-900 text-white font-bold rounded-xl shadow-lg text-sm"
+                                            onClick={() => handlePrint()}
+                                        >
+                                            <Printer className="h-4 w-4 mr-2" />
+                                            Download / Print Bill
+                                        </Button>
                                     </div>
                                 </div>
 
-                                {/* Footer */}
-                                <div className="pt-6 space-y-4 text-center">
-                                    <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                        <p className="text-[10px] text-slate-400 font-medium italic">Thank you for visiting Ama Bakery!</p>
-                                    </div>
-                                    <Button
-                                        className="w-full h-12 bg-slate-900 text-white font-bold rounded-xl shadow-lg"
-                                        onClick={() => window.print()}
-                                    >
-                                        <Printer className="h-4 w-4 mr-2" />
-                                        Download / Print Bill
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Receipt Zig Zag Bottom */}
-                            <div className="flex w-full overflow-hidden h-2">
-                                {[...Array(20)].map((_, i) => (
-                                    <div key={i} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 shrink-0 -translate-y-1" />
-                                ))}
-                            </div>
-                        </div>
+                            </div>{/* /bill-print-root */}
+                        </div>{/* /overflow scroll wrapper */}
                     </DialogContent>
                 </Dialog>
+
 
                 <WaiterBottomNav />
             </div>
@@ -440,8 +600,38 @@ export default function Checkout() {
             />
 
             <div className="p-4 space-y-4 max-w-2xl mx-auto">
+                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <User className="h-5 w-5 text-primary" />
+                            Customer Information
+                        </h3>
+                    </div>
+
+                    <div className="space-y-4">
+                        <CustomerSelector
+                            selectedCustomerId={customer?.id}
+                            onSelect={(c) => setCustomer(c)}
+                        />
+
+                        <Separator className="my-2" />
+
+                        <div>
+                            <Label htmlFor="specialInstructions" className="text-sm font-medium">Special Instructions</Label>
+                            <Input
+                                id="specialInstructions"
+                                type="text"
+                                placeholder="Any special requests?"
+                                value={specialInstructions}
+                                onChange={(e) => setSpecialInstructions(e.target.value)}
+                                className="mt-1"
+                            />
+                        </div>
+                    </div>
+                </Card>
+
                 {/* Order Summary Card */}
-                <Card className="card-elevated p-6 animate-slide-up">
+                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '200ms' }}>
                     <div className="flex items-center gap-3 mb-4">
                         <div className="h-12 w-12 rounded-xl bg-white p-1 shadow-sm border border-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
                             <img src="/logos/logo1white.jfif" alt="Logo" className="h-full w-full object-cover" />
@@ -493,28 +683,44 @@ export default function Checkout() {
                         </div>
 
                         <div className="flex flex-col gap-2 py-2 animate-in fade-in slide-in-from-top-1">
-                            <div className="flex justify-between items-center text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                    <span>Tax</span>
-                                    <Switch
-                                        checked={taxEnabled}
-                                        onCheckedChange={setTaxEnabled}
-                                        className="scale-75 data-[state=checked]:bg-primary"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center bg-white rounded-lg px-2 border w-20">
-                                        <Input
-                                            type="number"
-                                            value={taxRate}
-                                            onChange={(e) => setTaxRate(Number(e.target.value))}
-                                            className="w-12 h-7 p-0 text-center border-none bg-transparent text-xs font-bold focus-visible:ring-0"
+                            {taxEnabled && (
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <div className="flex items-center gap-2">
+                                        <span>Tax</span>
+                                        <Switch
+                                            checked={taxEnabled}
+                                            onCheckedChange={setTaxEnabled}
+                                            className="scale-75 data-[state=checked]:bg-primary"
                                         />
-                                        <span className="text-[10px] font-bold text-slate-400">%</span>
                                     </div>
-                                    <span className="font-bold text-foreground">Rs.{taxAmount.toFixed(2)}</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center bg-white rounded-lg px-2 border w-20">
+                                            <Input
+                                                type="number"
+                                                value={taxRate}
+                                                onChange={(e) => setTaxRate(Number(e.target.value))}
+                                                className="w-12 h-7 p-0 text-center border-none bg-transparent text-xs font-bold focus-visible:ring-0"
+                                            />
+                                            <span className="text-[10px] font-bold text-slate-400">%</span>
+                                        </div>
+                                        <span className="font-bold text-foreground">Rs.{taxAmount.toFixed(2)}</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {!taxEnabled && (
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <div className="flex items-center gap-2">
+                                        <span>Tax</span>
+                                        <Switch
+                                            checked={taxEnabled}
+                                            onCheckedChange={setTaxEnabled}
+                                            className="scale-75"
+                                        />
+                                    </div>
+                                    <span className="text-xs font-medium text-slate-300">Disabled</span>
+                                </div>
+                            )}
                             {taxEnabled && (
                                 <div className="flex gap-1 justify-end">
                                     {[5, 10, 15].map((rate) => (
@@ -557,38 +763,9 @@ export default function Checkout() {
                     </div>
                 </Card>
 
-                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <User className="h-5 w-5 text-primary" />
-                            Customer Information
-                        </h3>
-                    </div>
-
-                    <div className="space-y-4">
-                        <CustomerSelector
-                            selectedCustomerId={customer?.id}
-                            onSelect={(c) => setCustomer(c)}
-                        />
-
-                        <Separator className="my-2" />
-
-                        <div>
-                            <Label htmlFor="specialInstructions" className="text-sm font-medium">Special Instructions</Label>
-                            <Input
-                                id="specialInstructions"
-                                type="text"
-                                placeholder="Any special requests?"
-                                value={specialInstructions}
-                                onChange={(e) => setSpecialInstructions(e.target.value)}
-                                className="mt-1"
-                            />
-                        </div>
-                    </div>
-                </Card>
 
                 {/* Discount Card */}
-                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '200ms' }}>
+                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '300ms' }}>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Percent className="h-5 w-5 text-primary" />
                         Apply Discount (Optional)
@@ -622,7 +799,7 @@ export default function Checkout() {
                 </Card>
 
                 {/* Payment Timing Card */}
-                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '300ms' }}>
+                <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '400ms' }}>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Wallet className="h-5 w-5 text-primary" />
                         Payment Option
@@ -682,7 +859,7 @@ export default function Checkout() {
 
                 {/* Payment Method Card - Only show if Pay Now is selected */}
                 {paymentTiming === "now" && !showPaymentConfirmation && (
-                    <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '400ms' }}>
+                    <Card className="card-elevated p-6 animate-slide-up" style={{ animationDelay: '500ms' }}>
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <CreditCard className="h-5 w-5 text-primary" />
                             Select Payment Method

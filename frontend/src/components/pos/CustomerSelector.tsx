@@ -47,7 +47,7 @@ export function CustomerSelector({ onSelect, selectedCustomerId }: CustomerSelec
     };
 
     const filteredCustomers = useMemo(() => {
-        if (!searchTerm.trim()) return customers.slice(0, 5); // Show first 5 by default
+        if (!searchTerm.trim()) return []; // Changed to empty array by default
         return customers.filter(c =>
             c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             c.phone.includes(searchTerm)
@@ -105,13 +105,14 @@ export function CustomerSelector({ onSelect, selectedCustomerId }: CustomerSelec
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         className="h-10"
-                        autoFocus
+                        autoFocus={!newName}
                     />
                     <Input
                         placeholder="Phone Number"
                         value={newPhone}
                         onChange={(e) => setNewPhone(e.target.value)}
                         className="h-10"
+                        autoFocus={!!newName && !newPhone}
                     />
                     <Button
                         className="w-full h-11 font-bold gradient-warm"
@@ -192,28 +193,22 @@ export function CustomerSelector({ onSelect, selectedCustomerId }: CustomerSelec
                                     size="sm"
                                     className="rounded-full font-bold text-xs"
                                     onClick={() => {
+                                        const term = searchTerm.trim();
                                         setIsCreating(true);
-                                        setNewName(searchTerm);
-                                        setNewPhone("");
+                                        if (/^\+?\d+$/.test(term)) {
+                                            setNewName("");
+                                            setNewPhone(term);
+                                        } else {
+                                            setNewName(term);
+                                            setNewPhone("");
+                                        }
                                     }}
                                 >
                                     <UserPlus className="h-3.5 w-3.5 mr-2" />
                                     Add New Customer
                                 </Button>
                             </div>
-                        ) : (
-                            <div className="text-center py-4">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs font-bold text-primary"
-                                    onClick={() => setIsCreating(true)}
-                                >
-                                    <UserPlus className="h-4 w-4 mr-2" />
-                                    Create New Customer
-                                </Button>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             )}

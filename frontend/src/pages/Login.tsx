@@ -84,80 +84,94 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex overflow-hidden">
-      {/* LEFT SIDE */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary via-primary/90 to-primary overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
+    <div className="min-h-screen flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-gradient-cream">
+      {/* BRANDING SIDE */}
+      <div className="w-full lg:w-1/2 relative bg-primary overflow-hidden py-12 lg:py-0 flex items-center justify-center rounded-b-[3.5rem] lg:rounded-none shadow-2xl lg:shadow-none z-10 transition-all duration-700">
+        {/* Background Decorative Elements */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute -top-10 -left-10 lg:top-20 lg:left-20 w-48 h-48 lg:w-96 lg:h-96 bg-white rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-10 -right-10 lg:bottom-20 lg:right-20 w-64 h-64 lg:w-[32rem] lg:h-[32rem] bg-white rounded-full blur-[100px] animate-pulse delay-700" />
         </div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center w-full p-12 text-white">
-          <div className="max-w-md text-center space-y-8">
-            <div className="inline-flex items-center justify-center h-32 w-32 rounded-[2rem] bg-white shadow-2xl p-2 overflow-hidden mb-8">
+        <div className="relative z-10 flex flex-col items-center justify-center w-full p-6 lg:p-12 text-white">
+          <div className="max-w-md text-center space-y-4 lg:space-y-8">
+            <div className="inline-flex items-center justify-center h-28 w-28 lg:h-44 lg:w-44 rounded-full bg-white p-4 overflow-hidden mb-2 lg:mb-4 transition-transform hover:scale-105 duration-500">
               <img
                 src="/logos/logo1white.jfif"
                 alt="Ama Bakery Logo"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             </div>
 
-            <h1 className="text-5xl font-rockwell font-bold">Ama Bakery</h1>
-            <p className="text-white/80 text-sm font-bold uppercase tracking-[0.3em]">
-              Management Suite
-            </p>
+            <div className="space-y-1 lg:space-y-3">
+              <h1 className="text-4xl lg:text-6xl font-rockwell font-bold tracking-tight">AMA BAKERY</h1>
+              <p className="text-white/80 text-[10px] lg:text-base font-bold uppercase tracking-[0.4em]">
+                Management Suite
+              </p>
+            </div>
 
-            <p className="text-xl font-medium text-white/90 pt-6">
-              Secure access for staff members
-            </p>
+            <a
+              href="https://www.draguptech.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 lg:mt-12 text-[10px] lg:text-sm font-medium text-white/50 hover:text-white transition-all duration-500 flex items-center justify-center gap-3 group tracking-[0.2em] uppercase"
+            >
+              <span className="h-px w-4 lg:w-10 bg-white/10 group-hover:w-8 lg:group-hover:w-16 transition-all duration-700" />
+              <span>
+                Developed by <span className="font-extrabold text-white/90">Dragup Tech</span>
+              </span>
+              <span className="h-px w-4 lg:w-10 bg-white/10 group-hover:w-8 lg:group-hover:w-16 transition-all duration-700" />
+            </a>
           </div>
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8 bg-gradient-cream">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-[2rem] shadow-xl border-4 border-white p-8 md:p-10">
-            <h2 className="text-2xl font-black text-slate-900 mb-2">Welcome Back</h2>
-            <p className="text-slate-500 font-medium mb-8">Sign in to access your account</p>
+      {/* LOGIN SIDE */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8 lg:p-12 -mt-10 lg:mt-0 relative z-20">
+        <div className="w-full max-w-lg lg:max-w-2xl">
+          <div className="bg-white rounded-[2.5rem] lg:rounded-[3.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.12)] p-8 md:p-12 lg:p-20 lg:px-24 transition-all duration-500 hover:shadow-[0_20px_70px_rgba(0,0,0,0.18)] border border-slate-100">
+            <div className="mb-8 lg:mb-12 lg:text-left text-center">
+              <h2 className="text-2xl lg:text-4xl font-black text-slate-900 mb-1 lg:mb-3">Welcome Back</h2>
+              <p className="text-slate-500 text-sm lg:text-base font-medium italic">Sign in to access your dashboard</p>
+            </div>
 
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+            <form onSubmit={handleLogin} className="space-y-6 lg:space-y-8">
+              <div className="group">
+                <label className="text-[10px] lg:text-xs font-black uppercase tracking-widest text-slate-400 ml-1 mb-1.5 lg:mb-2 block group-focus-within:text-primary transition-colors">
                   Username
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
+                  <User className="absolute left-4 lg:left-5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 lg:h-6 lg:w-6 group-focus-within:text-primary transition-colors" />
                   <Input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="pl-12 h-14"
-                    placeholder="Enter your username"
+                    className="pl-12 lg:pl-16 h-12 lg:h-16 text-base lg:text-lg bg-slate-50 border-slate-100 focus:border-primary focus:bg-white transition-all rounded-xl lg:rounded-2xl"
+                    placeholder="your.username"
                     required
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+              <div className="group">
+                <label className="text-[10px] lg:text-xs font-black uppercase tracking-widest text-slate-400 ml-1 mb-1.5 lg:mb-2 block group-focus-within:text-primary transition-colors">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
+                  <Lock className="absolute left-4 lg:left-5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 lg:h-6 lg:w-6 group-focus-within:text-primary transition-colors" />
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-12 h-14"
-                    placeholder="Enter your password"
+                    className="pl-12 lg:pl-16 h-12 lg:h-16 text-base lg:text-lg bg-slate-50 border-slate-100 focus:border-primary focus:bg-white transition-all rounded-xl lg:rounded-2xl"
+                    placeholder="••••••••"
                     required
                   />
                 </div>
               </div>
 
               {error && (
-                <div className="bg-red-50 text-red-700 text-sm font-semibold px-4 py-3 rounded-xl border border-red-100">
+                <div className="bg-red-50 text-red-700 text-xs lg:text-sm font-semibold px-4 lg:px-6 py-3 lg:py-4 rounded-xl border border-red-100 animate-shake">
                   {error}
                 </div>
               )}
@@ -165,16 +179,18 @@ export default function Login() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full h-14 rounded-xl text-base font-black uppercase tracking-widest"
+                className="w-full h-12 lg:h-16 rounded-xl lg:rounded-2xl text-sm lg:text-lg font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all mt-2 lg:mt-6"
               >
-                {loading ? "Signing In..." : "Sign In"}
-                <ArrowRight className="h-5 w-5 ml-2" />
+                {loading ? "Verifying..." : "Sign In"}
+                <ArrowRight className="h-5 w-5 lg:h-6 lg:w-6 ml-2" />
               </Button>
             </form>
 
-            <p className="text-xs text-center text-slate-400 mt-6">
-              Secure authentication for all staff members
-            </p>
+            <div className="mt-6 lg:mt-8 pt-6 border-t border-slate-50">
+              <p className="text-[9px] lg:text-[11px] text-center text-slate-300 uppercase tracking-widest font-bold">
+                Secure Terminal Access • Staff Only
+              </p>
+            </div>
           </div>
         </div>
       </div>
