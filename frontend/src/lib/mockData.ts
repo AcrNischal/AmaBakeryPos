@@ -112,12 +112,7 @@ export const menuItems: MenuItem[] = [
 // Tables
 export const tables: Table[] = [
   { id: 't1', number: 1, status: 'available', capacity: 2 },
-  {
-    id: 't2', number: 2, status: 'occupied', capacity: 4, groups: [
-      { id: 'g1', name: 'Group A', orders: [] },
-      { id: 'g2', name: 'Group B', orders: [] }
-    ]
-  },
+  { id: 't2', number: 2, status: 'available', capacity: 4 },
   { id: 't3', number: 3, status: 'order-in-progress', capacity: 4, groups: [{ id: 'g3', name: 'Group A', orders: [] }] },
   { id: 't4', number: 4, status: 'available', capacity: 6 },
   { id: 't5', number: 5, status: 'payment-pending', capacity: 2, groups: [{ id: 'g5', name: 'Group A', orders: [] }] },

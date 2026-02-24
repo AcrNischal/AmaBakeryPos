@@ -192,7 +192,7 @@ export default function AdminOrders() {
                 <p className="text-xs font-bold uppercase text-muted-foreground mb-2 tracking-widest">Items</p>
                 <div className="space-y-2">
                   {selectedOrder.items?.map((item: any, idx: number) => {
-                    const productName = productsMap[String(item.product)]?.name || `Product #${item.product}`;
+                    const productName = item.product_name || productsMap[String(item.product)]?.name || `Product #${item.product}`;
                     return (
                       <div key={idx} className="flex justify-between text-sm">
                         <div className="flex flex-col text-left">

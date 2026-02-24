@@ -110,10 +110,15 @@ export default function TableSelection() {
       } as any);
     }
 
+    // Filter out 'Group A' for Table 2 and 4 as requested
+    const finalGroups = combinedGroups.filter(g =>
+      !((table.number === 2 || table.number === 4) && g.name === 'Group A')
+    );
+
     return {
       ...table,
       status: 'available' as const,
-      groups: combinedGroups
+      groups: finalGroups
     };
   });
 
@@ -147,9 +152,9 @@ export default function TableSelection() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <MobileHeader title="Select Table" notificationCount={2} />
+      <MobileHeader title="" notificationCount={2} />
 
-      <main className="p-4 max-w-2xl mx-auto pt-2 space-y-4">
+      <main className="p-4 max-w-2xl mx-auto pt-4 space-y-6">
         {/* Floor Selection */}
         <div className="flex items-center gap-3">
           <DropdownMenu>

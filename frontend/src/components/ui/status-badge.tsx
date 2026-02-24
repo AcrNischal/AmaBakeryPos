@@ -5,6 +5,7 @@ type StatusType = 'available' | 'occupied' | 'order-in-progress' | 'payment-pend
 interface StatusBadgeProps {
   status: string;
   className?: string;
+  label?: string;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -64,9 +65,13 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     label: 'In Stock',
     className: 'bg-success/15 text-success border-success/30',
   },
+  'waiter-paid': {
+    label: 'Waiter Paid',
+    className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
 };
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, className, label }: StatusBadgeProps) {
   const normStatus = status?.toLowerCase();
   const config = statusConfig[normStatus] || {
     label: status || 'Unknown',
@@ -75,11 +80,11 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
 
   return (
     <span className={cn(
-      "status-badge border px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+      "status-badge border px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider",
       config.className,
       className
     )}>
-      {config.label}
+      {label || config.label}
     </span>
   );
 }

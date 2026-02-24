@@ -62,7 +62,7 @@ export default function OrderEntry() {
       setCategories(categoryNames);
 
       if (categoryNames.length > 0) {
-        setSelectedCategory(categoryNames[0]);
+        // We default to "All" (empty string), so no need to set initial category
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load menu data");
@@ -213,6 +213,14 @@ export default function OrderEntry() {
       {/* Category Tabs */}
       <div className="sticky top-[120px] z-40 glass-panel border-b px-4 py-3 overflow-x-auto scrollbar-hide">
         <div className="flex gap-2">
+          <Button
+            variant={selectedCategory === "" ? "default" : "secondary"}
+            size="sm"
+            className="shrink-0"
+            onClick={() => setSelectedCategory("")}
+          >
+            All
+          </Button>
           {categories.map((category) => (
             <Button
               key={category}
@@ -319,19 +327,21 @@ export default function OrderEntry() {
       {cart.length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-50">
           <Button
-            className="w-full btn-touch gradient-warm shadow-warm-lg flex items-center justify-between px-6"
+            className="w-full h-16 rounded-[1.5rem] gradient-warm shadow-xl shadow-primary/20 flex items-center justify-between px-6 transition-all active:scale-95"
             onClick={() => setIsCartOpen(true)}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <div className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-card text-primary text-xs flex items-center justify-center font-bold">
+                <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                  <ShoppingCart className="h-6 w-6 text-white" />
+                </div>
+                <span className="absolute -top-2 -right-2 min-w-[22px] px-1.5 h-6 rounded-full bg-white text-primary text-[11px] flex items-center justify-center font-black border-2 border-primary shadow-sm">
                   {cartCount}
                 </span>
               </div>
-              <span>View Cart</span>
+              <span className="font-black uppercase tracking-wider text-sm">View Order</span>
             </div>
-            <span className="font-bold">Rs.{cartTotal}</span>
+            <span className="font-black text-lg">Rs.{cartTotal}</span>
           </Button>
         </div>
       )}

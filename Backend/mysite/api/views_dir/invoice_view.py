@@ -13,8 +13,6 @@ from ..serializer_dir.invoice_serializer import (
 
 
 class InvoiceViewClass(APIView):
-    todaydate = date.today()
-
     def get_user_role(self, user):
         return "SUPER_ADMIN" if user.is_superuser else getattr(user, "user_type", "")
 
@@ -28,17 +26,18 @@ class InvoiceViewClass(APIView):
     def get(self, request, id=None):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
+        today_date = date.today()
         from django.utils import timezone
 
         current_time = timezone.now()
-        print(current_time)
+        print(f"DEBUG: Current Time: {current_time}, Today Date Filter: {today_date}")
 
         if id:
             try:
                 # Apply branch filter for non-admin users
                 if role not in ["ADMIN", "SUPER_ADMIN"] and my_branch:
                     invoice = Invoice.objects.get(
-                        branch=my_branch, created_at__date=self.todaydate, id=id
+                        branch=my_branch, created_at__date=today_date, id=id
                     )
                     serializer = InvoiceResponseSerializer(invoice)
                     return Response({"success": True, "data": serializer.data})
@@ -50,12 +49,12 @@ class InvoiceViewClass(APIView):
             except Invoice.DoesNotExist:
                 return Response(
                     {"success": False, "error": "Invoice not found"},
-                    status=status.HTTP_404_NOT_FOUND,  # Use status constants
+                    status=status.HTTP_404_NOT_FOUND,
                 )
         else:
             if role in ["COUNTER", "WAITER", "KITCHEN"]:
                 invoices = Invoice.objects.filter(
-                    branch=my_branch, created_at__date=self.todaydate
+                    branch=my_branch, created_at__date=today_date
                 ).order_by("-created_at")
 
                 serializer = InvoiceResponseSerializer(invoices, many=True)
@@ -65,6 +64,8 @@ class InvoiceViewClass(APIView):
                 invoices = Invoice.objects.filter(branch=my_branch).order_by(
                     "-created_at"
                 )
+                serializer = InvoiceResponseSerializer(invoices, many=True)
+                return Response({"success": True, "data": serializer.data})
 
             invoices = Invoice.objects.all().order_by("-created_at")
             serializer = InvoiceResponseSerializer(invoices, many=True)

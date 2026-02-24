@@ -69,6 +69,7 @@ class Product(models.Model):
     low_stock_bar = models.IntegerField(default=0)
     created_at = models.DateTimeField(default=timezone.now)
     is_available = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} - {self.category.branch.name}"
@@ -142,6 +143,12 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="created_invoices"
+    )
+    received_by_waiter = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="waiter_received_invoices"
+    )
+    received_by_counter = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="counter_received_invoices"
     )
     floor = models.ForeignKey(
         Floor, on_delete=models.SET_NULL, null=True, related_name="floor_invoices"

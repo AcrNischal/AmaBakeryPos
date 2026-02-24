@@ -42,7 +42,7 @@ class ItemActivityClassView(APIView):
                 )
 
             if product_id:
-                product = get_object_or_404(Product, id=product_id)
+                product = get_object_or_404(Product, id=product_id, is_deleted=False)
                 data = request.data.copy()
                 data["product"] = product_id
 

@@ -22,7 +22,7 @@ export function AdminLayout() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden sticky top-0 z-30 flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="md:hidden sticky top-0 z-30 flex items-center justify-between p-4 pr-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-1">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>

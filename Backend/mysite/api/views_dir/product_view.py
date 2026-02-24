@@ -28,23 +28,23 @@ class ProductViewClass(APIView):
                 "COUNTER",
                 "KITCHEN",
             ]:
-                branch_product = get_object_or_404(Product, id=id)
+                branch_product = get_object_or_404(Product, id=id, is_deleted=False)
                 if branch_product.category.branch == my_branch:
                     product_details = ProductSerializer(branch_product)
                     return Response({"success": True, "data": product_details.data})
 
             if role in ["SUPER_ADMIN", "ADMIN"]:
-                product = get_object_or_404(Product, id=id)
+                product = get_object_or_404(Product, id=id, is_deleted=False)
                 serilizer = ProductSerializer(product)
                 return Response({"success": True, "data": serilizer.data})
         else:
             if role in ["BRANCH_MANAGER", "WAITER", "COUNTER", "KITCHEN"] and my_branch:
-                products = Product.objects.filter(category__branch=my_branch)
+                products = Product.objects.filter(category__branch=my_branch, is_deleted=False)
                 serilizer = ProductSerializer(products, many=True)
                 return Response({"success": True, "data": serilizer.data})
 
             if role in ["ADMIN", "SUPER_ADMIN"]:
-                products = Product.objects.all()
+                products = Product.objects.filter(is_deleted=False)
 
             # products = Product.objects.raw("select * from api_Product")
             #
@@ -375,36 +375,32 @@ class ProductViewClass(APIView):
             )
         try:
             if role in ["ADMIN", "SUPER_ADMIN"]:
-                product = Product.objects.get(id=id)
+                product = Product.objects.get(id=id, is_deleted=False)
             else:
-                product = Product.objects.get(id=id, category__branch=my_branch)
+                product = Product.objects.get(id=id, category__branch=my_branch, is_deleted=False)
 
             product_name = product.name
-            activity = product.to_product.all()
-
-            if (
-                activity.count() == 1
-                and activity.filter(remarks="Opening Stock").exists()
-            ):
-                with transaction.atomic():
-                    activity.delete()
-                    product.delete()
-
-                return Response(
-                    {
-                        "success": True,
-                        "message": f"Product '{product_name}' deleted successfully.",
-                    },
-                    status=status.HTTP_200_OK,
-                )
+            
+            # Soft delete: Just mark it as deleted and hidden
+            product.is_deleted = True
+            product.is_available = False
+            product.save()
 
             return Response(
-                {"success": False, "message": "Cannot delete product."},
-                status=status.HTTP_404_NOT_FOUND,
+                {
+                    "success": True,
+                    "message": f"Product '{product_name}' archived successfully.",
+                },
+                status=status.HTTP_200_OK,
             )
 
         except Product.DoesNotExist:
             return Response(
                 {"success": False, "message": "Product not found."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )

@@ -115,7 +115,7 @@ class PaymentClassView(APIView):
         role = getattr(request.user, "user_type", None)
         my_branch = getattr(request.user, "branch", None)
 
-        allowed_roles = ["ADMIN", "SUPER_ADMIN", "COUNTER", "BRANCH_MANAGER"]
+        allowed_roles = ["ADMIN", "SUPER_ADMIN", "COUNTER", "BRANCH_MANAGER", "WAITER"]
         if role not in allowed_roles:
             return Response(
                 {"success": False, "error": "Permission denied"},
@@ -141,14 +141,22 @@ class PaymentClassView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if amount <= 0:
+        # Determine if this is a zero-amount handover confirmation
+        is_handover_confirmation = (
+            amount == 0 
+            and invoice.payment_status == "PAID" 
+            and invoice.received_by_waiter 
+            and not invoice.received_by_counter
+        )
+
+        if amount <= 0 and not is_handover_confirmation:
             return Response(
                 {"success": False, "error": "Payment amount must be greater than 0"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         due_amount = invoice.total_amount - invoice.paid_amount
-        if amount > due_amount:
+        if not is_handover_confirmation and amount > due_amount:
             return Response(
                 {
                     "success": False,
@@ -168,8 +176,14 @@ class PaymentClassView(APIView):
             received_by=request.user,
         )
 
-        # Update invoice totals/status
+        # Update invoice totals/status and log receiving staff
         invoice.paid_amount += amount
+        
+        if role == "WAITER":
+            invoice.received_by_waiter = request.user
+        elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
+            invoice.received_by_counter = request.user
+
         if invoice.paid_amount >= invoice.total_amount:
             invoice.payment_status = "PAID"
         elif invoice.paid_amount > 0:

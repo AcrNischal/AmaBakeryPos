@@ -58,7 +58,7 @@ export default function CounterPOS() {
     const [selectedCategory, setSelectedCategory] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [cart, setCart] = useState<CartItemData[]>([]);
-    const [taxEnabled, setTaxEnabled] = useState(true);
+    const [taxEnabled, setTaxEnabled] = useState(false);
     const [taxRate, setTaxRate] = useState(5);
 
     // Billing States
@@ -158,11 +158,10 @@ export default function CounterPOS() {
             if (Array.isArray(data)) {
                 const order = data.find((inv: any) => inv.id === orderId);
                 if (order) {
-                    // Map items
                     const mappedItems = order.items.map((item: any) => ({
                         item: products.find(p => p.id === item.product) || {
                             id: item.product,
-                            name: `Product #${item.product}`,
+                            name: item.product_name || `Product #${item.product}`,
                             price: parseFloat(item.unit_price),
                             category: "Unknown",
                             available: true
@@ -299,7 +298,7 @@ export default function CounterPOS() {
                 branch: user?.branch_id,
                 customer: customer?.id || null,
                 invoice_type: "SALE",
-                invoice_description: "Counter Sale",
+                description: "Counter Sale",
                 tax_amount: taxAmount,
                 discount: 0,
                 paid_amount: total,
@@ -339,13 +338,13 @@ export default function CounterPOS() {
     return (
         <div className="h-screen bg-stone-50 flex flex-col overflow-hidden font-sans">
             {/* Top Header */}
-            <header className="h-16 bg-white border-b px-6 flex items-center justify-between shrink-0 z-10">
+            <header className="h-16 bg-white border-b px-6 pr-14 flex items-center justify-between shrink-0 z-10">
                 <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm bg-white p-0.5">
-                        <img src="/logos/logo1white.jfif" alt="Ama Bakery" className="h-full w-full object-cover rounded-lg" />
+                    <div className="h-12 w-12 rounded-full flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm bg-white p-0.5">
+                        <img src="/logos/logo1white.jfif" alt="AMA BAKERY" className="h-full w-full object-cover rounded-full" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-800 leading-none">Ama Bakery</h1>
+                        <h1 className="text-xl font-rockwell font-bold text-slate-800 leading-none">AMA BAKERY</h1>
                         <p className="text-[10px] font-bold text-primary tracking-widest uppercase mt-1">Counter POS Terminal</p>
                     </div>
                 </div>
@@ -358,9 +357,6 @@ export default function CounterPOS() {
                     <Separator orientation="vertical" className="h-8" />
                     <Button variant="ghost" size="icon" onClick={() => navigate('/counter/orders')} className="rounded-xl hover:bg-slate-100">
                         <Clock className="h-5 w-5 text-slate-500" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl text-destructive hover:bg-destructive/5">
-                        <LogOut className="h-5 w-5" />
                     </Button>
                 </div>
             </header>
@@ -521,28 +517,44 @@ export default function CounterPOS() {
                                 <span>Rs.{subtotal.toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col gap-2 py-2">
-                                <div className="flex justify-between items-center text-sm font-medium text-slate-500">
-                                    <div className="flex items-center gap-2">
-                                        <span>Tax</span>
-                                        <Switch
-                                            checked={taxEnabled}
-                                            onCheckedChange={setTaxEnabled}
-                                            className="scale-75 data-[state=checked]:bg-primary"
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex items-center bg-white rounded-lg px-2 border w-20">
-                                            <Input
-                                                type="number"
-                                                value={taxRate}
-                                                onChange={(e) => setTaxRate(Number(e.target.value))}
-                                                className="w-12 h-7 p-0 text-center border-none bg-transparent text-xs font-bold focus-visible:ring-0"
+                                {taxEnabled && (
+                                    <div className="flex justify-between items-center text-sm font-medium text-slate-500">
+                                        <div className="flex items-center gap-2">
+                                            <span>Tax</span>
+                                            <Switch
+                                                checked={taxEnabled}
+                                                onCheckedChange={setTaxEnabled}
+                                                className="scale-75 data-[state=checked]:bg-primary"
                                             />
-                                            <span className="text-[10px] font-bold text-slate-400">%</span>
                                         </div>
-                                        <span className="font-bold text-slate-700">Rs.{taxAmount.toFixed(2)}</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center bg-white rounded-lg px-2 border w-20">
+                                                <Input
+                                                    type="number"
+                                                    value={taxRate}
+                                                    onChange={(e) => setTaxRate(Number(e.target.value))}
+                                                    className="w-12 h-7 p-0 text-center border-none bg-transparent text-xs font-bold focus-visible:ring-0"
+                                                />
+                                                <span className="text-[10px] font-bold text-slate-400">%</span>
+                                            </div>
+                                            <span className="font-bold text-slate-700">Rs.{taxAmount.toFixed(2)}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {!taxEnabled && (
+                                    <div className="flex justify-between items-center text-sm font-medium text-slate-500">
+                                        <div className="flex items-center gap-2">
+                                            <span>Tax</span>
+                                            <Switch
+                                                checked={taxEnabled}
+                                                onCheckedChange={setTaxEnabled}
+                                                className="scale-75"
+                                            />
+                                        </div>
+                                        <span className="text-xs font-medium text-slate-300">Disabled</span>
+                                    </div>
+                                )}
                                 {taxEnabled && (
                                     <div className="flex gap-1 justify-end animate-in fade-in slide-in-from-top-1">
                                         {[5, 10, 15].map((rate) => (

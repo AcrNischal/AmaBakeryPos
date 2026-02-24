@@ -16,7 +16,8 @@ import {
     CreditCard,
     ShoppingBag,
     FileText,
-    Check
+    Check,
+    User
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -139,7 +140,10 @@ export default function CounterOrders() {
 
     const handlePaymentSubmit = async () => {
         if (!selectedOrder) return;
-        if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+        // Allow 0 amount if we are just confirming waiter handover
+        const isConfirmingHandover = selectedOrder.payment_status === 'PAID' && selectedOrder.received_by_waiter && !selectedOrder.received_by_counter;
+
+        if (!isConfirmingHandover && (!paymentAmount || parseFloat(paymentAmount) <= 0)) {
             toast.error("Please enter a valid amount");
             return;
         }
@@ -161,14 +165,21 @@ export default function CounterOrders() {
         }
     };
 
+    const getDisplayStatus = (order: any) => {
+        if (order.payment_status === 'PAID' && order.received_by_waiter && !order.received_by_counter) {
+            return 'waiter-paid';
+        }
+        return order.payment_status?.toLowerCase() || 'unpaid';
+    };
+
     const filteredOrders = useMemo(() => {
         if (!Array.isArray(orders)) return [];
         return orders.filter(order =>
             (order.invoice_number?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
             (order.customer_name?.toLowerCase() || "").includes(searchQuery.toLowerCase())
         ).sort((a, b) => {
-            const dateA = a.order_date ? new Date(a.order_date).getTime() : 0;
-            const dateB = b.order_date ? new Date(b.order_date).getTime() : 0;
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
             return dateB - dateA;
         });
     }, [orders, searchQuery]);
@@ -176,7 +187,7 @@ export default function CounterOrders() {
     return (
         <div className="h-screen bg-stone-50 flex flex-col overflow-hidden font-sans">
             {/* Header */}
-            <header className="h-16 bg-white border-b px-6 flex items-center justify-between shrink-0 z-10">
+            <header className="h-16 bg-white border-b px-6 pr-14 flex items-center justify-between shrink-0 z-10">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate('/counter/pos')} className="rounded-xl">
                         <ChevronLeft className="h-6 w-6" />
@@ -206,54 +217,56 @@ export default function CounterOrders() {
             </header>
 
             {/* Toolbar */}
-            <div className="p-6 shrink-0 flex flex-col md:flex-row gap-4">
+            <div className="px-6 py-4 shrink-0 flex flex-col md:flex-row gap-4">
                 <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                         placeholder="Search by Order ID or Table Number..."
-                        className="pl-12 h-14 text-lg rounded-2xl border-2 focus:border-primary bg-white shadow-sm"
+                        className="pl-10 h-10 rounded-lg border-slate-200 bg-white shadow-sm focus-visible:ring-1"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <Button variant="outline" className="h-14 px-6 rounded-2xl font-bold border-2 hover:bg-slate-50 gap-2">
-                    <Filter className="h-5 w-5" />
+                <Button variant="outline" className="h-10 px-4 rounded-lg font-medium border-slate-200 hover:bg-slate-50 gap-2 shadow-sm">
+                    <Filter className="h-4 w-4" />
                     Filters
                 </Button>
             </div>
 
             {/* Orders Table */}
             <main className="flex-1 overflow-hidden px-6 pb-6">
-                <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 h-full flex flex-col overflow-hidden">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
                     <div className="overflow-x-auto h-full custom-scrollbar">
                         <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 bg-white z-10 border-b">
+                            <thead className="sticky top-0 bg-slate-50/80 backdrop-blur-sm z-10 border-b">
                                 <tr>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Order ID</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Table / Mode</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Items</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Time</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Status</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Action</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Order ID</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Table / Mode</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Items</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Time</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Method</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Created By</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Total</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Status</th>
+                                    <th className="px-6 py-4 text-base font-bold text-slate-700">Action</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                        <td colSpan={9} className="px-6 py-20 text-center">
                                             <div className="flex flex-col items-center gap-4">
-                                                <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                                                <p className="text-xl font-black text-slate-400">Loading orders...</p>
+                                                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                                                <p className="text-xl font-bold text-slate-500">Loading orders...</p>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : filteredOrders.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                        <td colSpan={9} className="px-6 py-20 text-center">
                                             <div className="flex flex-col items-center gap-4 opacity-30">
-                                                <Clock className="h-20 w-20" />
-                                                <p className="text-xl font-black">No orders found</p>
+                                                <Clock className="h-16 w-16" />
+                                                <p className="text-xl font-bold">No orders found</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -261,61 +274,85 @@ export default function CounterOrders() {
                                     filteredOrders.map(order => (
                                         <tr
                                             key={order.id}
-                                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                                            className="hover:bg-slate-50 transition-colors group cursor-pointer"
                                             onClick={() => handleRowClick(order)}
                                         >
-                                            <td className="px-8 py-5">
-                                                <span className="font-mono text-sm font-bold text-slate-600">#{order.invoice_number}</span>
+                                            <td className="px-6 py-5">
+                                                <span className="font-mono text-[15px] font-semibold text-slate-600">#{order.invoice_number}</span>
                                             </td>
-                                            <td className="px-8 py-5">
+                                            <td className="px-6 py-5">
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-slate-800">
+                                                    <span className="text-base font-bold text-slate-800">
                                                         {order.customer_name || 'Walk-in'}
                                                     </span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.invoice_description || 'Sale'}</span>
+                                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{order.invoice_description || 'Sale'}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <div className="flex flex-col gap-1 max-w-[200px]">
+                                            <td className="px-6 py-5">
+                                                <div className="flex flex-col gap-0.5 max-w-[180px]">
                                                     {order.items?.slice(0, 2).map((item: any, i: number) => {
-                                                        const productName = productsMap[String(item.product)]?.name || `Product #${item.product}`;
+                                                        const productName = item.product_name || productsMap[String(item.product)]?.name || `Product #${item.product}`;
                                                         return (
-                                                            <span key={i} className="text-xs font-medium text-slate-600 truncate">
+                                                            <span key={i} className="text-sm font-medium text-slate-600 truncate">
                                                                 {item.quantity}x {productName}
                                                             </span>
                                                         );
                                                     })}
                                                     {(order.items?.length || 0) > 2 && (
-                                                        <span className="text-[10px] font-bold text-primary uppercase">+{order.items.length - 2} more items</span>
+                                                        <span className="text-xs font-bold text-primary">+{order.items.length - 2} more items</span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <span className="text-sm font-medium text-slate-500">
-                                                    {order.order_date ? format(parseISO(order.order_date), 'hh:mm a') : 'N/A'}
+                                            <td className="px-6 py-5">
+                                                <span className="text-[15px] font-medium text-slate-500">
+                                                    {order.created_at ? format(parseISO(order.created_at), 'hh:mm a') : 'N/A'}
                                                 </span>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <span className="font-black text-slate-900 text-lg">Rs.{order.total_amount}</span>
+                                            <td className="px-6 py-5">
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {order.payment_methods?.length > 0 ? (
+                                                        order.payment_methods.map((m: string, i: number) => (
+                                                            <span key={i} className="text-[11px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-500 uppercase tracking-tight">
+                                                                {m}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-[11px] font-bold text-slate-300 italic">UNPAID</span>
+                                                    )}
+                                                </div>
                                             </td>
-                                            <td className="px-8 py-5">
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <User className="h-4 w-4 text-slate-400" />
+                                                    <span className="text-sm font-semibold text-slate-600 truncate max-w-[120px]">
+                                                        {order.created_by_name || 'Waiter'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className="text-lg font-black text-slate-900">Rs.{parseFloat(order.total_amount).toFixed(2)}</span>
+                                            </td>
+                                            <td className="px-6 py-5">
                                                 <div className="flex items-center gap-2">
-                                                    <StatusBadge status={(order.payment_status?.toLowerCase() || 'unpaid')} />
+                                                    <StatusBadge
+                                                        status={getDisplayStatus(order)}
+                                                        className="text-[11px] px-2.5 py-1"
+                                                        label={getDisplayStatus(order) === 'waiter-paid' ? `Paid to ${order.received_by_waiter_name || 'Waiter'}` : undefined}
+                                                    />
                                                     {order.payment_status === 'PAID' && (
                                                         <div className="h-5 w-5 rounded-full bg-success/20 flex items-center justify-center">
-                                                            <Check className="h-3 w-3 text-success font-black" />
+                                                            <Check className="h-3 w-3 text-success font-bold" />
                                                         </div>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="rounded-xl hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100"
+                                                        className="h-9 w-9 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-100"
                                                         onClick={(e) => handleRowPrint(e, order)}
-                                                        title="Print"
                                                     >
                                                         <Printer className="h-4 w-4 text-slate-500" />
                                                     </Button>
@@ -323,14 +360,13 @@ export default function CounterOrders() {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="rounded-xl hover:bg-success/10 hover:shadow-md border border-transparent hover:border-success/20 group/pay"
+                                                            className="h-9 w-9 rounded-lg hover:bg-success/5 hover:border-success/20 text-success"
                                                             onClick={(e) => { e.stopPropagation(); handlePayOpen(order); }}
-                                                            title="Receive Payment"
                                                         >
-                                                            <CheckCircle2 className="h-4 w-4 text-success group-hover/pay:scale-110 transition-transform" />
+                                                            <CheckCircle2 className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100">
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
                                                         <MoreHorizontal className="h-4 w-4 text-slate-400" />
                                                     </Button>
                                                 </div>
@@ -401,6 +437,26 @@ export default function CounterOrders() {
                                         </div>
                                     </div>
 
+                                    {(selectedOrder?.received_by_waiter_name || selectedOrder?.received_by_counter_name) && (
+                                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Payment Receipt Log</p>
+                                            <div className="flex justify-between items-center text-xs">
+                                                {selectedOrder?.received_by_waiter_name && (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-400 font-medium">Waiter Handled:</span>
+                                                        <span className="font-bold text-indigo-600">{selectedOrder.received_by_waiter_name}</span>
+                                                    </div>
+                                                )}
+                                                {selectedOrder?.received_by_counter_name && (
+                                                    <div className="flex flex-col text-right">
+                                                        <span className="text-slate-400 font-medium">Counter Received:</span>
+                                                        <span className="font-bold text-emerald-600">{selectedOrder.received_by_counter_name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {(selectedOrder?.payment_status !== 'PAID') ? (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
                                             <div className="space-y-2">
@@ -458,13 +514,27 @@ export default function CounterOrders() {
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="py-10 text-center space-y-4 bg-emerald-50 rounded-[2rem] border border-emerald-100 animate-in zoom-in-95">
+                                        <div className="py-10 text-center space-y-6 bg-emerald-50 rounded-[2rem] border border-emerald-100 animate-in zoom-in-95">
                                             <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
                                                 <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                                             </div>
-                                            <div>
+                                            <div className="px-6">
                                                 <p className="text-xl font-black text-emerald-800">Fully Paid</p>
-                                                <p className="text-sm text-emerald-600 font-medium">No outstanding balance for this order</p>
+                                                <p className="text-sm text-emerald-600 font-medium">This order is fully paid by the customer.</p>
+
+                                                {selectedOrder?.received_by_waiter && !selectedOrder?.received_by_counter && (
+                                                    <div className="mt-6 pt-6 border-t border-emerald-100 space-y-4">
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/50">Cash Handover Required</p>
+                                                        <p className="text-xs text-emerald-700 font-bold italic">Wait! The waiter ({selectedOrder.received_by_waiter_name}) still has this cash. Click below once you receive it at the counter.</p>
+                                                        <Button
+                                                            className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 font-bold rounded-xl shadow-lg"
+                                                            onClick={() => { setPaymentAmount("0"); handlePaymentSubmit(); }}
+                                                            disabled={isPaying}
+                                                        >
+                                                            {isPaying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Handover to Counter"}
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -473,7 +543,7 @@ export default function CounterOrders() {
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
                                     <div className="space-y-3">
                                         {selectedOrder?.items?.map((item: any, idx: number) => {
-                                            const productName = productsMap[String(item.product)]?.name || `Product #${item.product}`;
+                                            const productName = item.product_name || productsMap[String(item.product)]?.name || `Product #${item.product}`;
                                             return (
                                                 <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                                     <div className="flex items-center gap-4">
@@ -574,7 +644,7 @@ export default function CounterOrders() {
 
                         <div className="space-y-2">
                             {selectedOrder?.items?.map((item: any, idx: number) => {
-                                const productName = productsMap[String(item.product)]?.name || `Product #${item.product}`;
+                                const productName = item.product_name || productsMap[String(item.product)]?.name || `Product #${item.product}`;
                                 return (
                                     <div key={idx} className="flex justify-between text-sm">
                                         <span className="text-left flex-1 font-medium">{productName} x {item.quantity}</span>

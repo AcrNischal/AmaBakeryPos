@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/kitchen/OrderCard";
-import { branches, User } from "@/lib/mockData";
+import { branches } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import {
   ChefHat,
@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { logout } from "../../auth/auth";
+import { getCurrentUser, logout } from "../../auth/auth";
 import { fetchInvoices, fetchProducts, fetchCategories, updateInvoiceStatus, fetchTables } from "../../api/index.js";
 
 export default function KitchenDisplay() {
@@ -74,7 +74,7 @@ export default function KitchenDisplay() {
       }, {});
 
       const mappedInvoices = (invoiceData || [])
-        .filter((inv: any) => inv && inv.is_active && (inv.invoice_status === 'PENDING' || inv.invoice_status === 'READY'))
+        .filter((inv: any) => inv && inv.is_active && (inv.invoice_status === 'PENDING' || inv.invoice_status === 'READY' || inv.invoice_status === 'COMPLETED'))
         .map((inv: any) => {
           // Extract table and group from description "Table 1 - Group A"
           const tableMatch = (inv.description || inv.invoice_description || "").match(/Table (\d+)/);
@@ -87,7 +87,7 @@ export default function KitchenDisplay() {
             tableNumber,
             groupName,
             waiter: inv.created_by_name || "Unknown",
-            createdAt: inv.order_date ? new Date(inv.order_date) : new Date(),
+            createdAt: inv.created_at ? new Date(inv.created_at) : new Date(),
             floor: inv.floor,
             floorName: inv.floor_name,
             status: inv.invoice_status === 'PENDING' ? 'new' :
@@ -117,9 +117,9 @@ export default function KitchenDisplay() {
   };
 
   // Get current user and branch
-  const storedUser = localStorage.getItem('currentUser');
-  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
-  const branch = branches.find(b => b.id === user?.branchId);
+  const user = getCurrentUser();
+  const userName = user?.username || "Chef";
+  const branchName = user?.branch_name || "Ama Bakery";
 
   // Determine Kitchen Type
   const kitchenType = user?.kitchenType || 'main'; // Default to 'main' if not specified
@@ -184,7 +184,7 @@ export default function KitchenDisplay() {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       {/* Header */}
-      <header className="flex-none bg-white border-b px-6 py-4 shadow-sm z-10">
+      <header className="flex-none bg-white border-b px-6 pr-14 py-4 shadow-sm z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
@@ -198,13 +198,13 @@ export default function KitchenDisplay() {
                   </h1>
                   <div className="bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-primary/10 flex items-center gap-1">
                     <MapPin className="h-2 w-2" />
-                    {branch?.name || "Global"}
+                    {branchName}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
                   <div className="flex items-center gap-2">
                     <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Feed • {user?.name || "Chef"}
+                    Live Feed • {userName}
                   </div>
                 </div>
               </div>
@@ -253,7 +253,7 @@ export default function KitchenDisplay() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-8">
             <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
               {/* Completed Orders Sheet */}
               <Sheet>
@@ -320,10 +320,6 @@ export default function KitchenDisplay() {
                 </SheetContent>
               </Sheet>
             </div>
-            <Button variant="outline" size="sm" onClick={logout} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
-              <LogOut className="h-3.5 w-3.5" />
-              Sign Out
-            </Button>
           </div>
         </div>
       </header>

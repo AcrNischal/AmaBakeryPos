@@ -7,12 +7,12 @@ from .models import (
     Customer,
     Floor,
     Invoice,
+    InvoiceItem,
     ItemActivity,
     Payment,
     Product,
     ProductCategory,
     User,
-    InvoiceItem,
 )
 
 
@@ -80,13 +80,15 @@ class InvoiceAdmin(admin.ModelAdmin):
     list_display = [
         "invoice_number",
         "id",
+        "branch",
         "customer",
         "invoice_type",
         "total_amount",
         "payment_status",
-        "total_amount",
         "created_at",
         "floor",
+        "received_by_waiter",
+        "received_by_counter",
     ]
 
     list_filter = ["invoice_type", "payment_status", "invoice_status", "branch"]
@@ -125,15 +127,11 @@ class InvoiceAdmin(admin.ModelAdmin):
         ("Status", {"fields": ("payment_status", "invoice_status", "is_active")}),
     )
 
+
 @admin.register(InvoiceItem)
 class InvoiceItemAdmin(admin.ModelAdmin):
-    list_display =(
-        "id",
-        "product",
-        "quantity",
-        "unit_price",
-        "discount_amount"
-    )
+    list_display = ("id", "product", "quantity", "unit_price", "discount_amount")
+
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):

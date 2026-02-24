@@ -5,9 +5,10 @@ from .item_activity_serializer import ItemActivitySerializer
 from django.db import transaction
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
     class Meta:
         model = InvoiceItem
-        fields = ["product", "quantity", "unit_price", "discount_amount"]
+        fields = ["product", "product_name", "quantity", "unit_price", "discount_amount"]
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
@@ -47,15 +48,25 @@ class InvoiceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         notes = validated_data.get('notes',"")
 
+        user = request.user if request else None
+
         # Create invoice skeleton
         invoice = Invoice.objects.create(
             **validated_data,
-            created_by=request.user if request else None,
+            created_by=user,
             subtotal=Decimal("0.00"),
             total_amount=Decimal("0.00"),
             paid_amount=paid_amount,
             payment_status="PENDING",
         )
+
+        # Log who received the initial payment
+        if paid_amount > 0 and user:
+            role = getattr(user, "user_type", None)
+            if role == "WAITER":
+                invoice.received_by_waiter = user
+            elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
+                invoice.received_by_counter = user
 
         # Generate invoice number
         invoice.invoice_number = f"INV-{invoice.id:06d}"
@@ -145,7 +156,10 @@ class InvoiceResponseSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     floor_name = serializers.CharField(source="floor.name", read_only=True)
     created_by_name = serializers.CharField(source="created_by.username", read_only=True)
+    received_by_waiter_name = serializers.CharField(source="received_by_waiter.username", read_only=True)
+    received_by_counter_name = serializers.CharField(source="received_by_counter.username", read_only=True)
     due_amount = serializers.SerializerMethodField()
+    payment_methods = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(
         format="%Y-%m-%d %H:%M:%S",
         read_only=True
@@ -166,7 +180,11 @@ class InvoiceResponseSerializer(serializers.ModelSerializer):
             "created_by",
             "created_at",
             "created_by_name",
-            "notes",               # assuming you have this field
+            "received_by_waiter",
+            "received_by_waiter_name",
+            "received_by_counter",
+            "received_by_counter_name",
+            "notes",
             "subtotal",
             "tax_amount",
             "discount",
@@ -178,7 +196,11 @@ class InvoiceResponseSerializer(serializers.ModelSerializer):
             "description",
             "invoice_status",
             "items",
+            "payment_methods",
         ]
 
     def get_due_amount(self, obj):
         return obj.total_amount - obj.paid_amount
+
+    def get_payment_methods(self, obj):
+        return list(obj.payments.values_list('payment_method', flat=True).distinct())
