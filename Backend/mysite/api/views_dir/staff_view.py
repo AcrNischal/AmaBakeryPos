@@ -1,4 +1,4 @@
-from django.db.models import Count, Sum, Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -41,7 +41,10 @@ class StaffReportViewClass(APIView):
         if role in ["SUPER_ADMIN", "ADMIN"]:
             if not branch_id:
                 return Response(
-                    {"success": False, "message": "branch_id is required for admin/superadmin"},
+                    {
+                        "success": False,
+                        "message": "branch_id is required for admin/superadmin",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             my_branch = branch_id
@@ -65,16 +68,20 @@ class StaffReportViewClass(APIView):
 
         for staff in staff_qs:
             # Invoices where this staff member was the waiter OR counter OR creator
-            invoices_all = Invoice.objects.filter(
-                branch=my_branch
-            ).filter(
-                Q(received_by_waiter=staff) |
-                Q(received_by_counter=staff) |
-                Q(created_by=staff)
-            ).distinct()
+            invoices_all = (
+                Invoice.objects.filter(branch=my_branch)
+                .filter(
+                    Q(received_by_waiter=staff)
+                    | Q(received_by_counter=staff)
+                    | Q(created_by=staff)
+                )
+                .distinct()
+            )
 
             total_orders = invoices_all.count()
-            total_sales = invoices_all.aggregate(total=Sum("total_amount"))["total"] or 0
+            total_sales = (
+                invoices_all.aggregate(total=Sum("total_amount"))["total"] or 0
+            )
 
             # Current month breakdown
             invoices_month = invoices_all.filter(
@@ -82,18 +89,22 @@ class StaffReportViewClass(APIView):
                 created_at__month=current_month,
             )
             current_month_orders = invoices_month.count()
-            current_month_sales = invoices_month.aggregate(total=Sum("total_amount"))["total"] or 0
+            current_month_sales = (
+                invoices_month.aggregate(total=Sum("total_amount"))["total"] or 0
+            )
 
-            staff_data.append({
-                "id": staff.id,
-                "name": staff.full_name or staff.username,
-                "username": staff.username,
-                "role": staff.user_type,
-                "total_orders": total_orders,
-                "total_sales": float(total_sales),
-                "current_month_orders": current_month_orders,
-                "current_month_sales": float(current_month_sales),
-            })
+            staff_data.append(
+                {
+                    "id": staff.id,
+                    "name": staff.full_name or staff.username,
+                    "username": staff.username,
+                    "role": staff.user_type,
+                    "total_orders": total_orders,
+                    "total_sales": float(total_sales),
+                    "current_month_orders": current_month_orders,
+                    "current_month_sales": float(current_month_sales),
+                }
+            )
 
         # Sort by total_orders descending
         staff_data.sort(key=lambda x: x["total_orders"], reverse=True)
