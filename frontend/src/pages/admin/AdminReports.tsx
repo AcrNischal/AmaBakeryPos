@@ -1,6 +1,5 @@
-import { analyticsData } from "@/lib/mockData";
 import { useState, useEffect } from "react";
-import { fetchReportDashboard } from "@/api/index.js";
+import { fetchReportDashboard, fetchStaffReport } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -23,24 +22,24 @@ import {
   Tooltip,
   ResponsiveContainer,
   LineChart,
-  Line
+  Line,
+  AreaChart,
+  Area
 } from "recharts";
 
-const waiterPerformance = [
-  { name: 'Rahul', orders: 45, sales: 8200, rating: 4.8 },
-  { name: 'Priya', orders: 52, sales: 9450, rating: 4.9 },
-  { name: 'Amit', orders: 38, sales: 6800, rating: 4.6 },
-  { name: 'Sneha', orders: 41, sales: 7350, rating: 4.7 },
-];
+
 
 export default function AdminReports() {
   const user = getCurrentUser();
   const [reportData, setReportData] = useState<any>(null);
+  const [staffData, setStaffData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [staffLoading, setStaffLoading] = useState(true);
   const [missingBranch, setMissingBranch] = useState(false);
 
   useEffect(() => {
     loadReportData();
+    loadStaffData();
   }, [user?.branch_id]);
 
   const loadReportData = async () => {
@@ -67,6 +66,25 @@ export default function AdminReports() {
     }
   };
 
+  const loadStaffData = async () => {
+    setStaffLoading(true);
+    try {
+      const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+      if (isSuperOrAdmin && !user?.branch_id) {
+        setStaffLoading(false);
+        return;
+      }
+      const branchId = isSuperOrAdmin ? user?.branch_id : null;
+      const data = await fetchStaffReport(branchId);
+      setStaffData(data?.staff_performance || []);
+    } catch (error) {
+      console.error("Failed to fetch staff report:", error);
+      toast.error("Failed to load staff data");
+    } finally {
+      setStaffLoading(false);
+    }
+  };
+
   // Build weekly chart data from API Weekly_sales field
   const weeklySalesRaw = reportData?.Weekly_sales || {};
   const weeklyChartData = [
@@ -81,6 +99,9 @@ export default function AdminReports() {
 
   // Real top-selling items from API
   const topItems: any[] = reportData?.top_selling_items_count || [];
+
+  // Build hourly chart data from API Hourly_sales field
+  const hourlyChartData = reportData?.Hourly_sales || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -154,34 +175,60 @@ export default function AdminReports() {
         </TabsList>
 
         <TabsContent value="sales" className="space-y-4">
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Weekly Sales Trend</h3>
+              <div>
+                <h3 className="text-lg font-semibold">Today's Sales Trend</h3>
+                <p className="text-xs text-muted-foreground">Hourly performance (8 AM - 8 PM)</p>
+              </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">This Week</Button>
+                <Button variant="outline" size="sm">Today</Button>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
+              <AreaChart data={hourlyChartData}>
+                <defs>
+                  <linearGradient id="colorSalesReports" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `Rs.${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                   }}
-                  formatter={(value: number) => `Rs.${value.toLocaleString()}`}
+                  formatter={(value: number) => [`Rs.${value.toLocaleString()}`, 'Sales']}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="sales"
                   stroke="hsl(var(--primary))"
                   strokeWidth={3}
-                  dot={{ fill: 'hsl(var(--primary))' }}
+                  fillOpacity={1}
+                  fill="url(#colorSalesReports)"
+                  dot={{ r: 4, strokeWidth: 2, fill: 'hsl(var(--card))' }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                  animationDuration={2000}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
@@ -273,21 +320,34 @@ export default function AdminReports() {
         <TabsContent value="staff" className="space-y-4">
           <div className="card-elevated p-6">
             <h3 className="text-lg font-semibold mb-6">Staff Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={waiterPerformance}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {staffLoading ? (
+              <div className="flex justify-center items-center h-[300px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : staffData.length === 0 ? (
+              <div className="flex justify-center items-center h-[300px] text-muted-foreground">
+                No staff data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={staffData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number, name: string) =>
+                      name === 'total_sales' ? `Rs.${value.toLocaleString()}` : value
+                    }
+                  />
+                  <Bar dataKey="total_orders" name="Orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="card-elevated overflow-hidden">
@@ -295,22 +355,34 @@ export default function AdminReports() {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="px-6 py-4 text-left font-medium text-muted-foreground">Staff</th>
-                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Orders</th>
-                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Sales</th>
-                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Rating</th>
+                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Role</th>
+                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Total Orders</th>
+                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Month Orders</th>
+                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Total Sales</th>
+                  <th className="px-6 py-4 text-left font-medium text-muted-foreground">Month Sales</th>
                 </tr>
               </thead>
               <tbody>
-                {waiterPerformance.map((staff) => (
-                  <tr key={staff.name} className="border-t">
-                    <td className="px-6 py-4 font-medium">{staff.name}</td>
-                    <td className="px-6 py-4">{staff.orders}</td>
-                    <td className="px-6 py-4">Rs.{staff.sales.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-success/10 text-success px-2 py-1 rounded-full text-sm font-medium">
-                        ⭐ {staff.rating}
-                      </span>
+                {staffLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center">
+                      <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                     </td>
+                  </tr>
+                ) : staffData.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                      No staff data available
+                    </td>
+                  </tr>
+                ) : staffData.map((staff) => (
+                  <tr key={staff.id} className="border-t">
+                    <td className="px-6 py-4 font-medium">{staff.name}</td>
+                    <td className="px-6 py-4 text-muted-foreground text-sm capitalize">{staff.role?.toLowerCase().replace('_', ' ')}</td>
+                    <td className="px-6 py-4">{staff.total_orders}</td>
+                    <td className="px-6 py-4">{staff.current_month_orders}</td>
+                    <td className="px-6 py-4 font-semibold text-primary">Rs.{Number(staff.total_sales).toLocaleString()}</td>
+                    <td className="px-6 py-4">Rs.{Number(staff.current_month_sales).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

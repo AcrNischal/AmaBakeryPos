@@ -26,7 +26,11 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  AreaChart,
+  Area,
+  Line,
+  ComposedChart
 } from "recharts";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -111,6 +115,8 @@ export default function AdminDashboard() {
     { day: 'Sun', sales: weeklySalesRaw.sunday || 0 },
   ];
 
+  const hourlyChartData = dashboardData?.Hourly_sales || [];
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
@@ -190,24 +196,58 @@ export default function AdminDashboard() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly Sales Chart */}
-        <div className="lg:col-span-2 card-elevated p-6">
-          <h3 className="text-lg font-semibold mb-4">Weekly Sales</h3>
+        {/* Premium Hourly Sales Chart */}
+        <div className="lg:col-span-2 card-elevated p-6 relative overflow-hidden">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold">Today's Sales Trend</h3>
+              <p className="text-xs text-muted-foreground">Hourly performance (8 AM - 8 PM)</p>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={weeklyChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <AreaChart data={hourlyChartData}>
+              <defs>
+                <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis
+                dataKey="hour"
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={11}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `Rs.${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                 }}
-                formatter={(value: number) => `Rs.${value.toLocaleString()}`}
+                formatter={(value: number) => [`Rs.${value.toLocaleString()}`, 'Sales']}
               />
-              <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Area
+                type="monotone"
+                dataKey="sales"
+                stroke="hsl(var(--primary))"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorSales)"
+                dot={{ r: 4, strokeWidth: 2, fill: 'hsl(var(--card))' }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+                animationDuration={2000}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
