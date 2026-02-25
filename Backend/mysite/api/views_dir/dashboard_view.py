@@ -107,28 +107,6 @@ class DashboardViewClass(APIView):
                     elif item["weekday"] == 1:
                         days["sunday"] = item["total_sales"]
 
-                # Hourly sales for today (8am to 8pm) - Global
-                hourly_data_global = (
-                    Invoice.objects.filter(
-                        created_at__date=today,
-                    )
-                    .annotate(hour=ExtractHour("created_at"))
-                    .values("hour")
-                    .annotate(total_sales=Sum("total_amount"))
-                )
-
-                hourly_sales_global = []
-                for h in range(8, 21):
-                    label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
-                    if h == 12:
-                        label = "12 PM"
-                    sales_val = 0
-                    for item in hourly_data_global:
-                        if item["hour"] == h:
-                            sales_val = float(item["total_sales"] or 0)
-                            break
-                    hourly_sales_global.append({"hour": label, "sales": sales_val})
-
                 return Response(
                     {
                         "success": True,
@@ -138,7 +116,6 @@ class DashboardViewClass(APIView):
                         "total_count_order": total_count_order,
                         "average_order_value": average,
                         "Weekely_Sales": days,
-                        "Hourly_sales": hourly_sales_global,
                     },
                     status=status.HTTP_200_OK,
                 )
