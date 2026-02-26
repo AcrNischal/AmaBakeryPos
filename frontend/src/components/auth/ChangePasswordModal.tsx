@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Eye, EyeOff, ShieldCheck, X } from "lucide-react";
+import { Lock, Eye, EyeOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -60,15 +60,6 @@ export function ChangePasswordModal({ isOpen, onClose }: ChangePasswordModalProp
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
                 <div className="bg-primary p-8 text-white relative">
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                    <div className="h-16 w-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md">
-                        <ShieldCheck className="h-8 w-8 text-white" />
-                    </div>
                     <DialogTitle className="text-2xl font-black mb-1">Security Update</DialogTitle>
                     <DialogDescription className="text-white/70 font-medium">
                         Choose a strong password to keep your account secure.
