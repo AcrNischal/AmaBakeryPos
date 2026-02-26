@@ -39,10 +39,11 @@ export function getCurrentUser() {
   const decoded = getDecodedToken();
   if (decoded) {
     const userRole = decoded.user_type;
-    const isSuperuser = decoded.is_superuser || userRole === 'SUPER_ADMIN';
+    const isSuperuser = decoded.is_superuser || userRole === "SUPER_ADMIN";
+    const canScopeBranch = isSuperuser || userRole === "ADMIN";
 
-    // If SuperAdmin has selected a specific branch, override the branch details
-    if (isSuperuser) {
+    // If SuperAdmin/Admin has selected a specific branch, override the branch details
+    if (canScopeBranch) {
       const selectedBranchStr = localStorage.getItem('selectedBranch');
       if (selectedBranchStr) {
         try {
@@ -51,7 +52,7 @@ export function getCurrentUser() {
             id: decoded.user_id,
             username: decoded.username,
             role: userRole,
-            is_superuser: true,
+            is_superuser: decoded.is_superuser,
             is_staff: decoded.is_staff,
             branch_id: selectedBranch.id,
             branch_name: selectedBranch.name,

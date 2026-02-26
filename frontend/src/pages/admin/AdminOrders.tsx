@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format, parseISO } from "date-fns";
 import { fetchInvoices, fetchProducts } from "@/api/index.js";
 import { toast } from "sonner";
+import { getCurrentUser } from "@/auth/auth";
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -16,11 +17,13 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [productsMap, setProductsMap] = useState<Record<string, any>>({});
+  const currentUser = getCurrentUser();
+  const branchId = currentUser?.branch_id ?? null;
 
   useEffect(() => {
     loadInvoices();
     loadProducts();
-  }, []);
+  }, [branchId]);
 
   const loadProducts = async () => {
     try {
@@ -39,7 +42,13 @@ export default function AdminOrders() {
     setLoading(true);
     try {
       const data = await fetchInvoices();
-      setOrders(data);
+      const scoped =
+        branchId != null
+          ? (data || []).filter(
+              (o: any) => o.branch === branchId || o.branch_id === branchId
+            )
+          : data || [];
+      setOrders(scoped);
     } catch (err: any) {
       toast.error(err.message || "Failed to load invoices");
     } finally {

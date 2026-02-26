@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory, updateCategory } from "../../api/index.js";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getCurrentUser } from "../../auth/auth";
 
 interface Product {
     id: number;
@@ -51,6 +52,8 @@ interface BackendCategory {
 }
 
 export default function AdminMenu() {
+    const user = getCurrentUser();
+    const branchId = user?.branch_id ?? null;
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<BackendCategory[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,7 +74,7 @@ export default function AdminMenu() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [branchId]);
 
     const loadData = async () => {
         setLoading(true);
@@ -80,8 +83,15 @@ export default function AdminMenu() {
                 fetchProducts(),
                 fetchCategories()
             ]);
-            setProducts(productsData);
-            setCategories(categoriesData);
+            const scopedProducts = branchId != null
+                ? (productsData || []).filter((p: Product) => p.branch_id === branchId)
+                : productsData || [];
+            const scopedCategories = branchId != null
+                ? (categoriesData || []).filter((c: BackendCategory) => c.branch === branchId)
+                : categoriesData || [];
+
+            setProducts(scopedProducts);
+            setCategories(scopedCategories);
         } catch (err: any) {
             toast.error(err.message || "Failed to load data");
         } finally {
@@ -129,7 +139,7 @@ export default function AdminMenu() {
         setSubmitting(true);
         const formData = new FormData(e.currentTarget);
 
-        const payload = {
+        const payload: any = {
             name: formData.get("name"),
             cost_price: "0.00",
             selling_price: formData.get("selling_price"),
@@ -138,6 +148,11 @@ export default function AdminMenu() {
             category: selectedCategoryId,
             is_available: formAvailable
         };
+
+        // If admin/super-admin is scoped to a branch, ensure product is created in that branch
+        if (branchId) {
+            payload.branch = branchId;
+        }
 
         if (!selectedCategoryId) {
             toast.error("Please select a category");
@@ -186,7 +201,11 @@ export default function AdminMenu() {
     const handleAddCategory = async () => {
         if (newCategoryInput.trim()) {
             try {
-                const response = await createCategory({ name: newCategoryInput.trim() });
+                const categoryPayload: any = { name: newCategoryInput.trim() };
+                if (branchId) {
+                    categoryPayload.branch = branchId;
+                }
+                const response = await createCategory(categoryPayload);
                 setCategories(prev => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
                 setNewCategoryInput("");
                 toast.success(response.message || "Category added");
@@ -324,7 +343,11 @@ export default function AdminMenu() {
                                                             className="w-full text-left px-4 py-3 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-2 border-t border-slate-50"
                                                             onClick={async () => {
                                                                 try {
-                                                                    const response = await createCategory({ name: catSearchValue.trim() });
+                                                                    const catPayload: any = { name: catSearchValue.trim() };
+                                                                    if (branchId) {
+                                                                        catPayload.branch = branchId;
+                                                                    }
+                                                                    const response = await createCategory(catPayload);
                                                                     const newCat = response.data;
                                                                     setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
                                                                     setSelectedCategoryId(newCat.id);

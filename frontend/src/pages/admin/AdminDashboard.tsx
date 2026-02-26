@@ -1,7 +1,6 @@
 import { StatCard } from "@/components/admin/StatCard";
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { branches } from "@/lib/mockData";
 import { fetchDashboardDetails, fetchInvoices, fetchTables } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
@@ -38,7 +37,8 @@ const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 
 
 export default function AdminDashboard() {
   const user = getCurrentUser();
-  const branch = branches.find(b => b.id === user?.branch_id);
+  const branchLabel =
+    user?.branch_name || (user?.branch_id ? `Branch #${user.branch_id}` : "Global");
 
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -84,9 +84,24 @@ export default function AdminDashboard() {
     try {
       const data = await fetchInvoices();
       // Sort by ID descending (newest first)
-      const sorted = Array.isArray(data) ? [...data].sort((a: any, b: any) => b.id - a.id) : [];
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a: any, b: any) => b.id - a.id)
+        : [];
+
+      // For branch-scoped admin/super admin, only show orders from that branch
+      const isSuperOrAdmin =
+        user?.is_superuser || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+      const hasBranchScope = isSuperOrAdmin && user?.branch_id;
+
+      const filtered = hasBranchScope
+        ? sorted.filter(
+            (order: any) =>
+              order.branch === user.branch_id || order.branch_id === user.branch_id
+          )
+        : sorted;
+
       // Show only top 5 recent
-      setRecentOrders(sorted.slice(0, 5));
+      setRecentOrders(filtered.slice(0, 5));
     } catch (err: any) {
       // Slient fail for dashboard recent orders if it's not the primary focus
       console.error("Dashboard recent orders failed:", err);
@@ -128,7 +143,7 @@ export default function AdminDashboard() {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
             <div className="bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border border-primary/20">
               <MapPin className="h-3 w-3" />
-              {branch?.name || "Global"}
+              {branchLabel}
             </div>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {user?.name || "Admin"}! Here's what's happening at your branch today.</p>
