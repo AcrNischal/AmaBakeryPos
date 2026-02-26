@@ -102,13 +102,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         if last_invoice_date != today_date:
             day_list = today_date.split("-")
-            day_list.append("1")
+            day_list.append(f"{1:02d}")
             final_invoice_no = "-".join(day_list)
-            final_invoice_no = f"{branch_id}-" + final_invoice_no
+            final_invoice_no = f"{branch_id:02d}-" + final_invoice_no
         else:
             last_invoice_list = latest_invoice_number.split("-")
-            last_invoice_list[-1] = str(int(last_invoice_list[-1]) + 1)
-            last_invoice_list[0] = str(branch_id)
+            last_invoice_list[-1] = f"{int(last_invoice_list[-1]) + 1:02d}"
+            last_invoice_list[0] = f"{branch_id:02d}"
             final_invoice_no = "-".join(last_invoice_list)
 
         invoice.invoice_number = final_invoice_no
