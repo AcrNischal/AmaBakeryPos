@@ -39,8 +39,8 @@ export function getCurrentUser() {
   const decoded = getDecodedToken();
   if (decoded) {
     const userRole = decoded.user_type;
-    const isSuperuser = decoded.is_superuser || userRole === "SUPER_ADMIN";
-    const canScopeBranch = isSuperuser || userRole === "ADMIN";
+    const isSuperuser = decoded.is_superuser || userRole === 'SUPER_ADMIN';
+    const canScopeBranch = isSuperuser || userRole === 'ADMIN';
 
     // If SuperAdmin/Admin has selected a specific branch, override the branch details
     if (canScopeBranch) {

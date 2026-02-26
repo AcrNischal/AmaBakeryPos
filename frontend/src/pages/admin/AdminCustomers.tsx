@@ -27,6 +27,7 @@ import {
     SheetDescription
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { getCurrentUser } from "@/auth/auth";
 
 // Define interface matching local needs but populated from API
 interface Customer {
@@ -51,6 +52,8 @@ export default function AdminCustomers() {
     const [deleting, setDeleting] = useState(false);
     const [editing, setEditing] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const currentUser = getCurrentUser();
+    const branchId = currentUser?.branch_id ?? null;
 
     // Edit Customer State
     const [editCustomer, setEditCustomer] = useState<{
@@ -70,7 +73,7 @@ export default function AdminCustomers() {
 
     useEffect(() => {
         loadCustomers();
-    }, []);
+    }, [branchId]);
 
     const loadCustomers = async () => {
         setLoading(true);
@@ -88,7 +91,11 @@ export default function AdminCustomers() {
                 lastOrderDate: c.date ? new Date(c.date).toLocaleDateString() : "N/A",
                 branch: c.branch
             }));
-            setCustomers(mapped);
+
+            const scoped =
+                branchId != null ? mapped.filter((c) => c.branch === branchId) : mapped;
+
+            setCustomers(scoped);
         } catch (err: any) {
             toast.error(err.message || "Failed to load customers");
         } finally {
@@ -104,7 +111,11 @@ export default function AdminCustomers() {
 
         setCreating(true);
         try {
-            await createCustomer(newCustomer);
+            const payload: any = { ...newCustomer };
+            if (branchId) {
+                payload.branch = branchId;
+            }
+            await createCustomer(payload);
             toast.success("Customer created successfully");
             setIsAddModalOpen(false);
             setNewCustomer({ name: "", email: "", phone: "", address: "" }); // Reset form

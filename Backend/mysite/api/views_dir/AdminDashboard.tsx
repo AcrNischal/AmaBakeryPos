@@ -38,7 +38,8 @@ const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 
 export default function AdminDashboard() {
   const user = getCurrentUser();
   const branchLabel =
-    user?.branch_name || (user?.branch_id ? `Branch #${user.branch_id}` : "Global");
+    user?.branch_name ||
+    (user?.branch_id ? `Branch #${user.branch_id}` : "Global");
 
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -84,11 +85,9 @@ export default function AdminDashboard() {
     try {
       const data = await fetchInvoices();
       // Sort by ID descending (newest first)
-      const sorted = Array.isArray(data)
-        ? [...data].sort((a: any, b: any) => b.id - a.id)
-        : [];
+      const sorted = Array.isArray(data) ? [...data].sort((a: any, b: any) => b.id - a.id) : [];
 
-      // For branch-scoped admin/super admin, only show orders from that branch
+      // For branch-scoped super admin/admin, only show orders from the selected branch
       const isSuperOrAdmin =
         user?.is_superuser || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
       const hasBranchScope = isSuperOrAdmin && user?.branch_id;

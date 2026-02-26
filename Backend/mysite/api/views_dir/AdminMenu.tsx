@@ -25,9 +25,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory, updateCategory } from "../../api/index.js";
+import { getCurrentUser } from "../../auth/auth";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { getCurrentUser } from "../../auth/auth";
 
 interface Product {
     id: number;
@@ -83,12 +83,13 @@ export default function AdminMenu() {
                 fetchProducts(),
                 fetchCategories()
             ]);
-            const scopedProducts = branchId != null
+            // If we are branch-scoped (super admin/admin accessing a branch), only keep that branch's data
+            const scopedProducts = branchId
                 ? (productsData || []).filter((p: Product) => p.branch_id === branchId)
-                : productsData || [];
-            const scopedCategories = branchId != null
+                : productsData;
+            const scopedCategories = branchId
                 ? (categoriesData || []).filter((c: BackendCategory) => c.branch === branchId)
-                : categoriesData || [];
+                : categoriesData;
 
             setProducts(scopedProducts);
             setCategories(scopedCategories);
@@ -149,7 +150,7 @@ export default function AdminMenu() {
             is_available: formAvailable
         };
 
-        // If admin/super-admin is scoped to a branch, ensure product is created in that branch
+        // For scoped super admin/admin, ensure we create/update in the selected branch
         if (branchId) {
             payload.branch = branchId;
         }

@@ -18,53 +18,57 @@ class ProductViewClass(APIView):
     def get(self, request, id=None):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
+
+
+
+
+        # Support branch_id query parameter for global admins
+        branch_id = request.query_params.get("branch_id") or request.query_params.get(
+            "branch"
+        )
+        
+
         if id:
             # get single product
-            if role in [
-                "SUPER_ADMIN",
-                "ADMIN",
-                "BRANCH_MANAGER",
-                "WAITER",
-                "COUNTER",
-                "KITCHEN",
-            ]:
-                branch_product = get_object_or_404(Product, id=id, is_deleted=False)
-                if branch_product.category.branch == my_branch:
-                    product_details = ProductSerializer(branch_product)
-                    return Response({"success": True, "data": product_details.data})
+            product = get_object_or_404(Product, id=id, is_deleted=False)
 
-            if role in ["SUPER_ADMIN", "ADMIN"]:
-                product = get_object_or_404(Product, id=id, is_deleted=False)
-                serilizer = ProductSerializer(product)
-                return Response({"success": True, "data": serilizer.data})
-        else:
-            if role in ["BRANCH_MANAGER", "WAITER", "COUNTER", "KITCHEN"] and my_branch:
-                products = Product.objects.filter(category__branch=my_branch, is_deleted=False)
-                serilizer = ProductSerializer(products, many=True)
-                return Response({"success": True, "data": serilizer.data})
-
-            if role in ["ADMIN", "SUPER_ADMIN"]:
-                products = Product.objects.filter(is_deleted=False)
-
-            # products = Product.objects.raw("select * from api_Product")
-            #
-            # table_name = Product._meta.db_table
-            # print(f"Using table: {table_name}")  # Debug output
-            #
-            # for pro in products:
-            #     print(pro)
-            #
-            # serilizer = ProductSerializer(products, many=True)
-            # return Response({"success": True, "data": serilizer.data})
-
-            if not my_branch:
+            # Permission check: Non-admins can only see their branch products
+            if role not in ["SUPER_ADMIN", "ADMIN"] and product.branch != my_branch:
                 return Response(
-                    {"success": False, "message": "Branch not found"}, status=400
+                    {
+                        "success": False,
+                        "message": "Access denied to other branch products.",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
-            return Response(
-                {"success": False, "message": "User Type not found"}, status=400
-            )
+            serializer = ProductSerializer(product)
+            return Response({"success": True, "data": serializer.data})
+
+        else:
+            # Base queryset: all active products
+            products = Product.objects.filter(is_deleted=False)
+
+            if role in ["ADMIN", "SUPER_ADMIN"]:
+                # If a branch filter is provided, use it
+                print("This is branch id->> ",branch_id)
+                if branch_id:
+                    products = products.filter(branch_id=branch_id)
+            else:
+                # Branch staff only see their own branch products
+                if my_branch:
+                    products = products.filter(branch=my_branch)
+                else:
+                    return Response(
+                        {
+                            "success": False,
+                            "message": "Your user account is not assigned to a branch.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            serializer = ProductSerializer(products, many=True)
+            return Response({"success": True, "data": serializer.data})
 
     def post(self, request, product_id=None, action=None):
         role = self.get_user_role(request.user)
@@ -92,27 +96,29 @@ class ProductViewClass(APIView):
 
         # Check if product already exists (case-insensitive)
         cat = request.data.get("category")
-        existing_product = Product.objects.filter(name__iexact=product_name,branch=my_branch,category = cat).first()
+        existing_product = Product.objects.filter(
+            name__iexact=product_name, branch=my_branch, category=cat
+        ).first()
         #
         if existing_product:
-              return Response(
-                  {
-                      "success": False,
-                      "message": f"Product '{product_name}' already exists.",
-                      "existing_product": {
-                          "id": existing_product.id,
-                          "name": existing_product.name,
-                          "category": existing_product.category.name
-                          if existing_product.category
-                          else None,
-                          "branch": existing_product.category.branch.name
-                          if existing_product.category
-                          else None,
-                      },
-                  },
-                  status=status.HTTP_409_CONFLICT,  # 409 Conflict is perfect for this
-              )
-        
+            return Response(
+                {
+                    "success": False,
+                    "message": f"Product '{product_name}' already exists.",
+                    "existing_product": {
+                        "id": existing_product.id,
+                        "name": existing_product.name,
+                        "category": existing_product.category.name
+                        if existing_product.category
+                        else None,
+                        "branch": existing_product.category.branch.name
+                        if existing_product.category
+                        else None,
+                    },
+                },
+                status=status.HTTP_409_CONFLICT,  # 409 Conflict is perfect for this
+            )
+
         # Prepare data
         data = request.data.copy()
         if not my_branch:
@@ -201,7 +207,7 @@ class ProductViewClass(APIView):
         my_branch = request.user.branch
 
         # Permission check
-        if role != "BRANCH_MANAGER" and role != "SUPER_ADMIN":
+        if role != "BRANCH_MANAGER" and role != "SUPER_ADMIN" and role != "ADMIN":
             return Response(
                 {
                     "success": False,
@@ -224,7 +230,11 @@ class ProductViewClass(APIView):
             ).get(id=id)
 
             # Verify product belongs to user's branch
-            if product.category.branch != my_branch and role != "SUPER_ADMIN":
+            if (
+                product.category.branch != my_branch
+                and role != "SUPER_ADMIN"
+                and role != "ADMIN"
+            ):
                 return Response(
                     {
                         "success": False,
@@ -378,10 +388,37 @@ class ProductViewClass(APIView):
             if role in ["ADMIN", "SUPER_ADMIN"]:
                 product = Product.objects.get(id=id, is_deleted=False)
             else:
-                product = Product.objects.get(id=id, category__branch=my_branch, is_deleted=False)
+                product = Product.objects.get(
+                    id=id, category__branch=my_branch, is_deleted=False
+                )
 
             product_name = product.name
-            
+
+            # Soft delete: Just mark it as deleted and hidden
+            product.is_deleted = True
+            product.is_available = False
+            product.save()
+
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Product '{product_name}' archived successfully.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Product.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Product not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "message": f"An error occurred: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            product_name = product.name
+
             # Soft delete: Just mark it as deleted and hidden
             product.is_deleted = True
             product.is_available = False

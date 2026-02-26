@@ -18,6 +18,7 @@ interface UserType {
   username: string;
   full_name: string;
   user_type: string;
+  branch?: number;
   branch_name?: string;
 }
 
@@ -47,6 +48,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const currentUser = getCurrentUser();
+  const branchId = currentUser?.branch_id ?? null;
 
   const canResetPassword = (targetRole: string) => {
     if (!currentUser?.role) return false;
@@ -60,13 +62,17 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [branchId]);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
       const data = await fetchUsers();
-      setUserList(data);
+      const scoped =
+        branchId != null
+          ? (data || []).filter((u: any) => u.branch === branchId)
+          : data || [];
+      setUserList(scoped);
     } catch (err: any) {
       toast.error("Failed to load users", { description: err.message });
     } finally {
@@ -94,12 +100,17 @@ export default function AdminUsers() {
     e.preventDefault();
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    const payload = {
+    const payload: any = {
       full_name: formData.get("full_name"),
       username: formData.get("username"),
       user_type: formData.get("user_type"),
       email: formData.get("email"),
     };
+
+    // When admin/super admin is scoped to a branch, create/update users in that branch
+    if (branchId) {
+      payload.branch = branchId;
+    }
 
     try {
       if (editUser) {

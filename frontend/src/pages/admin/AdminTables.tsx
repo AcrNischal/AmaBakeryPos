@@ -27,6 +27,7 @@ import {
 
 export default function AdminTables() {
     const user = getCurrentUser();
+    const branchId = user?.branch_id ?? null;
     const [floors, setFloors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isUpdating, setIsUpdating] = useState<string | null>(null);
@@ -37,15 +38,15 @@ export default function AdminTables() {
 
     useEffect(() => {
         loadTableData();
-    }, [user?.branch_id]);
+    }, [branchId]);
 
     const loadTableData = async () => {
         setLoading(true);
         try {
             const data = await fetchTables();
-            // Data is filtered by branch in backend for managers/waiters
-            // But for safety or if admin sees all, we might want to filter here or just show all
-            setFloors(data || []);
+            const scoped =
+                branchId != null ? (data || []).filter((f: any) => f.branch === branchId) : data || [];
+            setFloors(scoped);
             if (data && data.length > 0 && selectedFloorId === null) {
                 const storedFloorId = localStorage.getItem('adminSelectedFloorId');
                 if (storedFloorId) {
