@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
     Users,
-    Shield,
     Key,
     Plus,
     Search,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 import { fetchUsers, createUser, updateUser, deleteUser, fetchBranches } from "../../api/index.js";
 import { ResetPasswordModal } from "../../components/auth/ResetPasswordModal";
-import { KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 import { Button } from "@/components/ui/button";

@@ -15,7 +15,6 @@ import {
   BarChart3
 } from "lucide-react";
 import { getCurrentUser, logout } from "../../auth/auth";
-import { ChangePasswordModal } from "../auth/ChangePasswordModal";
 import { useState } from "react";
 
 
@@ -39,7 +38,6 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const location = useLocation();
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
 
   // Get current user and branch
@@ -90,27 +88,15 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
       {/* Security Info */}
       <div className="p-4 border-t border-sidebar-border space-y-2">
         <button
-          onClick={() => setIsResetModalOpen(true)}
-          className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all"
-        >
-          <Shield className="h-5 w-5" />
-          Change Password
-        </button>
-
-        <button
-          onClick={() => logout()}
-          className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all text-left"
+          onClick={() => {
+            if (confirm("Are you sure you want to log out?")) logout();
+          }}
+          className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 transition-all"
         >
           <LogOut className="h-5 w-5" />
-          Sign Out
+          Logout
         </button>
       </div>
-
-      <ChangePasswordModal
-        isOpen={isResetModalOpen}
-        onClose={() => setIsResetModalOpen(false)}
-      />
     </div>
   );
 }
-

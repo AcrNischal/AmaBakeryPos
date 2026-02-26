@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Eye, EyeOff, ShieldAlert, X } from "lucide-react";
+import { Lock, Eye, EyeOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -64,15 +64,6 @@ export function ResetPasswordModal({ isOpen, onClose, user }: ResetPasswordModal
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[400px] rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
                 <div className="bg-destructive p-6 text-white relative">
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                    <div className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md">
-                        <ShieldAlert className="h-6 w-6 text-white" />
-                    </div>
                     <DialogTitle className="text-xl font-black mb-1">Administrative Reset</DialogTitle>
                     <DialogDescription className="text-white/70 font-medium">
                         Resetting password for <span className="text-white font-bold">{user.full_name || user.username}</span>

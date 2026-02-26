@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
     BarChart3,
     TrendingUp,
-    Calendar,
     Users,
     ShoppingBag,
     DollarSign,
@@ -85,11 +84,7 @@ export default function SuperAdminAnalytics() {
                     <p className="text-sm text-muted-foreground font-medium">Tracking performance across all regions and branches.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-white border rounded-xl px-3 py-1.5 shadow-sm">
-                        <Calendar className="h-4 w-4 text-slate-400 mr-2" />
-                        <span className="text-sm font-bold text-slate-700">{timeRange}</span>
-                    </div>
-                    <Button variant="outline" size="icon" className="rounded-xl" onClick={loadData}>
+                    <Button variant="outline" size="icon" className="rounded-xl">
                         <Filter className="h-4 w-4" />
                     </Button>
                     <Button className="rounded-xl bg-slate-900 group">

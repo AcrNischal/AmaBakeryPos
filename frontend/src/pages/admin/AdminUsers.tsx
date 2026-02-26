@@ -9,7 +9,6 @@ import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed, L
 import { toast } from "sonner";
 import { fetchUsers, createUser, updateUser, deleteUser } from "../../api/index.js";
 import { ResetPasswordModal } from "../../components/auth/ResetPasswordModal";
-import { KeyRound } from "lucide-react";
 import { getCurrentUser } from "@/auth/auth";
 
 

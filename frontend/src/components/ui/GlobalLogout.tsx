@@ -1,4 +1,4 @@
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { logout, isLoggedIn, getCurrentUser } from "@/auth/auth";
 import { ChangePasswordModal } from "../auth/ChangePasswordModal";
 
@@ -38,18 +38,17 @@ export function GlobalLogout() {
 
     const user = getCurrentUser();
     // Hide floating button for Admin and HQ roles as they'll have it in the header
-    const hideFloating = user?.role === "ADMIN" || user?.role === "BRANCH_MANAGER";
+    const hideFloating = user?.role === "ADMIN" || user?.role === "BRANCH_MANAGER" || user?.role === "COUNTER" || user?.role === "KITCHEN";
 
     return (
         <>
             {!hideFloating && (
-                <div className="fixed top-3 right-4 z-[100] no-print flex gap-2">
+                <div className="fixed top-3 right-4 z-[100] no-print flex items-center gap-2">
                     <button
                         onClick={() => setShowChangePassword(true)}
-                        className="flex items-center justify-center h-10 w-10 rounded-full bg-white border border-slate-100 hover:bg-slate-50 transition-all group shadow-none"
-                        title="Change Password"
+                        className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-primary hover:border-primary transition-all shadow-sm"
                     >
-                        <ShieldCheck className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                        Change Password
                     </button>
                     <button
                         onClick={() => setShowConfirm(true)}
