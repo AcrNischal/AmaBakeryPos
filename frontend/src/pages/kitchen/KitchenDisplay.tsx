@@ -14,7 +14,8 @@ import {
   Coffee,
   Loader2,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Volume2
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -58,11 +59,12 @@ export default function KitchenDisplay() {
   const playNotificationSound = () => {
     try {
       const audio = new Audio("/noti.mp3");
-      audio.play().catch(() => {
-        // Autoplay may be blocked by browser until user interaction
+      audio.volume = 1.0;
+      audio.play().catch((err) => {
+        console.warn("Audio play blocked:", err);
       });
-    } catch {
-      // Ignore audio errors
+    } catch (err) {
+      console.error("Audio error:", err);
     }
   };
 
@@ -76,14 +78,20 @@ export default function KitchenDisplay() {
 
     socket.onopen = () => {
       setSocketConnected(true);
+      console.log("[Kitchen WS] Connected");
     };
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log("[Kitchen WS] Message:", data);
         if (data.type === "invoice_created") {
-          // New order placed - play sound and refresh
+          // New order placed - play sound, show toast, and refresh
           playNotificationSound();
+          toast.success("New Order Received!", {
+            description: "A new order has been placed",
+            icon: <Bell className="h-5 w-5 text-primary" />,
+          });
           loadData();
         } else if (data.type === "invoice_updated") {
           // Order updated - just refresh (no sound for updates in kitchen)
@@ -96,10 +104,12 @@ export default function KitchenDisplay() {
 
     socket.onclose = () => {
       setSocketConnected(false);
+      console.log("[Kitchen WS] Disconnected");
     };
 
-    socket.onerror = () => {
+    socket.onerror = (err) => {
       setSocketConnected(false);
+      console.error("[Kitchen WS] Error:", err);
     };
 
     return () => {
@@ -309,6 +319,16 @@ export default function KitchenDisplay() {
 
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={playNotificationSound}
+                className="text-primary hover:bg-primary hover:text-white font-bold transition-all px-3 gap-2 rounded-xl"
+                title="Test notification sound"
+              >
+                <Volume2 className="h-4 w-4" />
+                Test Sound
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
