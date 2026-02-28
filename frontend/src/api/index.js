@@ -111,7 +111,6 @@ async function apiFetch(endpoint, options = {}) {
     console.warn("Access token expired, attempting refresh...");
     try {
       const newToken = await refreshAccessToken();
-
       // Retry with new token
       fetchOptions.headers["Authorization"] = `Bearer ${newToken}`;
       response = await fetch(url, fetchOptions);
@@ -165,7 +164,6 @@ export async function loginUsers(username, password) {
   if (!data?.access) {
     throw new Error("Login response missing access token.");
   }
-
   saveTokens(data);
   return data;
 }
