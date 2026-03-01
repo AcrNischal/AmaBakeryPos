@@ -174,7 +174,7 @@ export default function SuperAdminOverview() {
         b.location.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const totalRevenue = branches.reduce((sum, b) => sum + (b.revenue || 0), 0);
+    const totalRevenue = branches.reduce((sum, b) => sum + (parseFloat(b.revenue as any) || 0), 0);
     const totalStaff = branches.reduce((sum, b) => sum + (b.branch_manager?.total_user || 0), 0);
     const activeBranches = branches.filter(b => (b.status || 'active') === 'active').length;
 
@@ -199,11 +199,10 @@ export default function SuperAdminOverview() {
                 <div>
                     <div className="flex items-center gap-3 mb-1">
                         <h1 className="text-2xl md:text-3xl font-black tracking-tight">Enterprise Overview</h1>
-                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${
-                            sseConnected 
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
-                                : "bg-slate-100 text-slate-400 border-slate-200"
-                        }`}>
+                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${sseConnected
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            : "bg-slate-100 text-slate-400 border-slate-200"
+                            }`}>
                             {sseConnected ? (
                                 <>
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -296,7 +295,7 @@ export default function SuperAdminOverview() {
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                             data={(() => {
-                                const ws = dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
+                                const ws = dashboardData?.weekly_sales || dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
                                 return [
                                     { day: 'Mon', sales: ws.monday || 0 },
                                     { day: 'Tue', sales: ws.tuesday || 0 },
@@ -420,7 +419,7 @@ export default function SuperAdminOverview() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-5 text-right whitespace-nowrap">
-                                            <p className="font-black text-slate-900">Rs. {(branch.revenue || 0).toLocaleString()}</p>
+                                            <p className="font-black text-slate-900">Rs. {(parseFloat(branch.revenue as any) || 0).toLocaleString()}</p>
                                             <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Good Standing</p>
                                         </td>
                                         <td className="px-6 py-5 text-right whitespace-nowrap">

@@ -58,8 +58,16 @@ export default function AdminDashboard() {
         ...data,
       }));
       setSSEConnected(true);
-      // Also refresh recent orders when we get an update
-      loadRecentOrders();
+
+      // If we have recent_orders/recent_activity in the SSE data, use them
+      if (data.recent_orders) {
+        setRecentOrders(data.recent_orders.slice(0, 5));
+      } else if (data.recent_activity) {
+        setRecentOrders(data.recent_activity.slice(0, 5));
+      } else {
+        // Fallback: refresh recent orders manually
+        loadRecentOrders();
+      }
     }
   }, []);
 
@@ -117,9 +125,9 @@ export default function AdminDashboard() {
 
       const filtered = hasBranchScope
         ? sorted.filter(
-            (order: any) =>
-              order.branch === user.branch_id || order.branch_id === user.branch_id
-          )
+          (order: any) =>
+            order.branch === user.branch_id || order.branch_id === user.branch_id
+        )
         : sorted;
 
       // Show only top 5 recent
@@ -137,7 +145,7 @@ export default function AdminDashboard() {
   const isGlobalView = isSuperOrAdmin && !user?.branch_id;
 
   // Build weekly chart data from API response (handles both key spellings)
-  const weeklySalesRaw = dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
+  const weeklySalesRaw = dashboardData?.weekly_sales || dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
   const weeklyChartData = [
     { day: 'Mon', sales: weeklySalesRaw.monday || 0 },
     { day: 'Tue', sales: weeklySalesRaw.tuesday || 0 },
@@ -177,11 +185,10 @@ export default function AdminDashboard() {
               <MapPin className="h-3 w-3" />
               {branchLabel}
             </div>
-            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border ${
-              sseConnected 
-                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
-                : "bg-slate-100 text-slate-400 border-slate-200"
-            }`}>
+            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border ${sseConnected
+              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+              : "bg-slate-100 text-slate-400 border-slate-200"
+              }`}>
               {sseConnected ? (
                 <>
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -466,14 +473,14 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
-                      {order.items.length} items
+                      {order.items?.length || 0} items
                     </span>
                   </td>
                   <td className="px-6 py-4 text-muted-foreground">
                     {order.created_by_name}
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={order.payment_status.toLowerCase()} className="shadow-none border h-6 px-2.5" />
+                    <StatusBadge status={(order.payment_status || "PENDING").toLowerCase()} className="shadow-none border h-6 px-2.5" />
                   </td>
                   <td className="px-6 py-4 text-right font-black text-primary">
                     Rs.{order.total_amount}

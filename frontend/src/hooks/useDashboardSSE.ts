@@ -37,15 +37,21 @@ export function useDashboardSSE(
 
     const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const baseUrl = rawBase.replace(/\/+$/, "");
-    
-    // Build URL with branch_id if provided
-    let url = `${baseUrl}/api/dashboard/stream/`;
+
+    // Build URL with params
+    const queryParams = new URLSearchParams();
     if (branchId) {
-      url += `?branch_id=${branchId}`;
+      queryParams.append("branch_id", branchId.toString());
     }
 
-    // Note: EventSource doesn't support custom headers, so we need to pass token via query
-    // For now, we'll rely on cookie-based auth which is already set up
+    const token = getAccessToken();
+    if (token) {
+      queryParams.append("token", token);
+    }
+
+    const url = `${baseUrl}/api/dashboard/stream/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+    // For better security, withCredentials still ensures cookies are sent if any
     const eventSource = new EventSource(url, { withCredentials: true });
 
     eventSource.onopen = () => {
@@ -69,7 +75,7 @@ export function useDashboardSSE(
     eventSource.onerror = (error) => {
       console.error("[SSE] Error:", error);
       eventSource.close();
-      
+
       // Reconnect after 5 seconds
       reconnectTimeoutRef.current = setTimeout(() => {
         console.log("[SSE] Attempting to reconnect...");
