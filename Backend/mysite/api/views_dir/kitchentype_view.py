@@ -13,16 +13,32 @@ class KitchenViewClass(APIView):
     def get(self,request,id=None):
         my_branch = request.user.branch
         role = self.get_user_role(request.user)
+
+
         if id:
-            kitchentype = Kitchentype.objects.get_object_or_404(id=id)
-            serilizer = KitchenTypeSerializer(kitchentype)
+            if not role in ["ADMIN","SUPER_ADMIN"]:
+                if my_branch:
+                    kitchentype = Kitchentype.objects.filter(id=id,branch=my_branch)
+                    serilizer = KitchenTypeSerializer(kitchentype)
+                    return Response({"success":True,"data" :serilizer.data})
+
+        else:
+                kitchentype = Kitchentype.objects.all()
+                serilizer = KitchenTypeSerializer(kitchentype)
+                return Response({"success":True,"data" :serilizer.data})
 
 
-        if role in ["ADMIN","SUPER_ADMIN"]:
-            kitchentype = Kitchentype.objects.all()
-            serilizer = KitchenTypeSerializer(kitchentype)
+
 
         return Response({"success":True,"data" :serilizer.data})
+
+    def post(self,request):
+        my_branch = request.user.branch
+        role = self.get_user_role(request.user)
+
+
+
+
 
         
 
