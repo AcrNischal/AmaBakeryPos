@@ -58,7 +58,7 @@ class InvoiceViewClass(APIView):
             if role in ["COUNTER", "WAITER", "KITCHEN"]:
                 invoices = Invoice.objects.filter(
                     branch=my_branch, created_at__date=today_date
-                ).exclude(payment_status__in=["PAID", "CANCELLED"])
+                ).exclude(payment_status__in=["CANCELLED"])
             elif role == "BRANCH_MANAGER":
                 invoices = Invoice.objects.filter(branch=my_branch)
             else:
