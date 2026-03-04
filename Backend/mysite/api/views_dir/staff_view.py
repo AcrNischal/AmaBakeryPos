@@ -65,9 +65,42 @@ class StaffReportViewClass(APIView):
         staff_qs = User.objects.filter(
             branch=my_branch,
             is_active=True,
-        ).exclude(is_superuser=True)
+            
+        ).exclude(user_type = ["KITCHEN","BRANCH_MANAGER"],is_superuser=True)
 
         staff_data = []
+
+
+        cnt = 0
+        print(today)
+        for staff in staff_qs:
+            inv = Invoice.objects.raw(
+                """
+                SELECT 
+                    %s as id,
+                    COUNT(*) as total_order,
+                    SUM(I.total_amount) as total_sales,
+                    %s as staff_name,
+                    %s as staff_id_display
+                FROM api_invoice I
+                WHERE I.branch_id = %s 
+                AND DATE(I.created_at) = %s
+                AND (
+                    I.received_by_waiter_id = %s OR 
+                    I.received_by_counter_id = %s OR 
+                    I.created_by_id = %s
+                )
+                """,
+                [staff.id, staff.full_name, staff.id, my_branch.id, today, staff.id, staff.id, staff.id]
+            )
+            
+            for item in inv:
+                    print(f"Staff {item.staff_id_display}: {item.total_order} orders, Sales: Rs.{item.total_sales}")
+                    # Or with name
+
+
+
+
 
         for staff in staff_qs:
             # Invoices where this staff member was the waiter OR counter OR creator
