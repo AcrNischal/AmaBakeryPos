@@ -45,8 +45,8 @@ export default function AdminOrders() {
       const scoped =
         branchId != null
           ? (data || []).filter(
-              (o: any) => o.branch === branchId || o.branch_id === branchId
-            )
+            (o: any) => o.branch === branchId || o.branch_id === branchId
+          )
           : data || [];
       setOrders(scoped);
     } catch (err: any) {
@@ -143,7 +143,7 @@ export default function AdminOrders() {
                   <td className="px-6 py-4">{order.created_by_name}</td>
                   <td className="px-6 py-4">{order.customer_name || 'Walk-in'}</td>
                   <td className="px-6 py-4 text-muted-foreground text-sm">
-                    {order.order_date ? format(parseISO(order.order_date), 'MMM d, h:mm a') : 'N/A'}
+                    {order.created_at ? format(parseISO(order.created_at), 'MMM d, h:mm a') : 'N/A'}
                   </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={(order.payment_status || 'unpaid').toLowerCase()} />
