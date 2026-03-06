@@ -15,8 +15,10 @@ import {
   Loader2,
   Layers,
   ChevronDown,
-  Volume2
+  Volume2,
+  Clock
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -161,11 +163,13 @@ export default function KitchenDisplay() {
                 quantity: item.quantity || 0,
                 menuItem: {
                   name: product?.name || `Product #${item.product}`,
-                  category: product?.category_name || 'Uncategorized'
+                  category: product?.category_name || 'Uncategorized',
+                  categoryId: product?.category // Add category ID for filtering
                 },
                 notes: item.description || ""
               };
-            })
+            }),
+            createdAt: inv.created_at
           };
         });
 
@@ -182,9 +186,9 @@ export default function KitchenDisplay() {
   const userName = user?.username || "Chef";
   const branchName = user?.branch_name || "Ama Bakery";
 
-  // Determine Kitchen Type
-  const kitchenType = user?.kitchenType || 'main'; // Default to 'main' if not specified
-  const isBreakfastKitchen = kitchenType === 'breakfast';
+  // Determine User's Kitchen assignment
+  const userKitchenId = user?.kitchentype_id;
+  const userKitchenName = user?.kitchentype_name;
 
   // Filter Orders Logic
   const filteredOrders = (orders || [])
@@ -195,18 +199,18 @@ export default function KitchenDisplay() {
     .map(order => {
       if (!order || !order.items) return null;
 
-      // Filter items based on category
+      // Filter items based on category's kitchen type
       const relevantItems = order.items.filter((item: any) => {
         if (!item || !item.menuItem) return false;
 
         // Find the category object for this item
-        const itemCat = (categories || []).find(c => c && c.name === item.menuItem.category);
-        const kitchenTarget = isBreakfastKitchen ? 'breakfast' : 'main';
+        const itemCat = (categories || []).find(c => c && c.id === item.menuItem.categoryId);
 
-        // If categories are empty or category has no type, default to 'main'
-        const catType = itemCat?.type || 'main';
+        // If user has no specific kitchen assigned (e.g. Admin), show all
+        if (!userKitchenId) return true;
 
-        return catType === kitchenTarget;
+        // Match the item's kitchen type with the user's assigned kitchen
+        return itemCat?.kitchentype === userKitchenId;
       });
 
       // Return order with ONLY relevant items, or null if no items match
@@ -249,13 +253,13 @@ export default function KitchenDisplay() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isBreakfastKitchen ? 'bg-orange-100 text-orange-600' : 'bg-primary/10 text-primary'}`}>
-                {isBreakfastKitchen ? <Utensils className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <ChefHat className="h-6 w-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0.5">
                   <h1 className="text-xl font-bold text-foreground">
-                    {isBreakfastKitchen ? 'Breakfast Kitchen' : 'Main Kitchen'}
+                    {userKitchenName || 'General Kitchen'}
                   </h1>
                   <div className="bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-primary/10 flex items-center gap-1">
                     <MapPin className="h-2 w-2" />
@@ -377,7 +381,15 @@ export default function KitchenDisplay() {
                               <div>
                                 <h3 className="font-bold text-slate-800">Order #{order.id.slice(-3)}</h3>
                                 <p className="text-sm text-slate-500">Table {order.tableNumber} • {order.waiter}</p>
-                                {order.floorName && <p className="text-[10px] font-black text-primary uppercase">{order.floorName}</p>}
+                                <div className="flex items-center gap-4">
+                                  {order.floorName && <span className="text-[10px] font-black text-primary uppercase">{order.floorName}</span>}
+                                  {order.createdAt && (
+                                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                      <Clock className="h-2.5 w-2.5" />
+                                      {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-black uppercase tracking-widest text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">

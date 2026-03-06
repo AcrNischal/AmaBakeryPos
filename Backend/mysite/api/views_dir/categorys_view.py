@@ -91,13 +91,17 @@ class CategoryViewClass(APIView):
 
         # Check for duplicate category name in the same branch
         # Case-insensitive check
-        if ProductCategory.objects.filter(
-            branch=my_branch, name__iexact=new_name
-        ).exists():
+        duplicate_filter = {"name__iexact": new_name}
+        if my_branch:
+            duplicate_filter["branch"] = my_branch
+        elif "branch" in request.data:
+            duplicate_filter["branch_id"] = request.data.get("branch")
+
+        if ProductCategory.objects.filter(**duplicate_filter).exists():
             return Response(
                 {
                     "success": False,
-                    "message": f"A category named '{new_name}' already exists in {my_branch.name}.",
+                    "message": f"A category named '{new_name}' already exists.",
                 },
                 status=status.HTTP_409_CONFLICT,
             )
@@ -110,10 +114,16 @@ class CategoryViewClass(APIView):
             # If branch is specified in request, use it
             # Otherwise, default to user's branch
             if "branch" not in data:
-                data["branch"] = my_branch.id
+                if my_branch:
+                    data["branch"] = my_branch.id
+                else:
+                    return Response({"success": False, "message": "Branch is required for categories"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             # Non-SUPER_ADMIN users can only create in their own branch
-            data["branch"] = my_branch.id
+            if my_branch:
+                data["branch"] = my_branch.id
+            else:
+                return Response({"success": False, "message": "User has no branch assigned"}, status=status.HTTP_400_BAD_REQUEST)
 
             # If they're trying to specify a different branch, reject it
             if (
@@ -171,10 +181,10 @@ class CategoryViewClass(APIView):
         try:
             # Get category - SUPER_ADMIN can access any, others only their branch
             if role in ["SUPER_ADMIN", "ADMIN"]:
-                category = ProductCategory.objects.get_object_(id=id)
+                category = get_object_or_404(ProductCategory, id=id)
             else:
-                category = ProductCategory.objects.get(id=id, branch=my_branch)
-        except ProductCategory.DoesNotExist:
+                category = get_object_or_404(ProductCategory, id=id, branch=my_branch)
+        except Exception as e:
             return Response(
                 {"success": False, "message": "Category not found"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -231,8 +241,12 @@ class CategoryViewClass(APIView):
         my_branch = request.user.branch
 
         if id:
-            if role in ["ADMIN", "SUPER_ADMIN"]:
-                category = ProductCategory.objects.get_object_or_404(id=id)
+            filter_kwargs = {"id": id}
+            if role not in ["ADMIN", "SUPER_ADMIN"]:
+                filter_kwargs["branch"] = my_branch
+                
+            if role in ["ADMIN", "SUPER_ADMIN", "BRANCH_MANAGER"]:
+                category = get_object_or_404(ProductCategory, **filter_kwargs)
                 category.delete()
                 return Response(
                     {
@@ -240,12 +254,5 @@ class CategoryViewClass(APIView):
                         "message": "Category deleted Sucessfully!",
                     }
                 )
-            if role == "BRANCH_MANAGER":
-                category = ProductCategory.objects.get_object_or_404(id=id)
-                category.delete()
-                return Response(
-                    {
-                        "success": True,
-                        "message": "Category deleted Sucessfully!",
-                    }
-                )
+            
+            return Response({"success": False, "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)

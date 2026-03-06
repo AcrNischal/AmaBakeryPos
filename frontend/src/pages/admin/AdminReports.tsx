@@ -23,8 +23,13 @@ import {
   LineChart,
   Line,
   AreaChart,
-  Area
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
+
+const PAYMENT_COLORS = ['hsl(142, 71%, 45%)', 'hsl(217, 91%, 60%)', 'hsl(32, 95%, 44%)', 'hsl(280, 65%, 60%)', 'hsl(0, 84%, 60%)'];
 
 
 
@@ -177,7 +182,7 @@ export default function AdminReports() {
           <div className="card-elevated p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold">Weekly Sales Trend</h3>
+                <h3 className="text-lg font-semibold">Weekly Sales Trend (Current Week)</h3>
                 <p className="text-xs text-muted-foreground">Performance overview for the current week</p>
               </div>
               <div className="flex gap-2">
@@ -225,7 +230,7 @@ export default function AdminReports() {
                   fill="url(#colorSalesReports)"
                   dot={{ r: 4, strokeWidth: 2, fill: 'hsl(var(--card))' }}
                   activeDot={{ r: 6, strokeWidth: 0 }}
-                  animationDuration={2000}
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -258,11 +263,141 @@ export default function AdminReports() {
               </p>
             </div>
           </div>
+
+          {/* Payment Method Distribution */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="card-elevated p-8 relative">
+              <div className="mb-6 text-center">
+                <h3 className="text-lg font-black uppercase tracking-tight">Sales by Payment Method (Monthly)</h3>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Transaction spread</p>
+              </div>
+              <div className="h-[300px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={(reportData?.sales_by_payment_method || []).map((p: any) => ({
+                        ...p,
+                        total_amount: parseFloat(String(p.total_amount || 0)) || 0
+                      }))}
+                      dataKey="total_amount"
+                      nameKey="payment_method"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={110}
+                      paddingAngle={5}
+                      stroke="none"
+                      isAnimationActive={false}
+                    >
+                      {(reportData?.sales_by_payment_method || []).map((_: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} className="hover:opacity-80 transition-opacity cursor-pointer" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-black text-slate-800">
+                    Rs.{Number(reportData?.total_month_sales || 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] font-black text-primary uppercase tracking-widest">Month Total</span>
+                </div>
+              </div>
+              <div className="mt-8 space-y-3">
+                {(reportData?.sales_by_payment_method || []).map((item: any, index: number) => (
+                  <div key={item.payment_method} className="flex items-center justify-between px-4 py-2 rounded-xl bg-slate-50/50 border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }}
+                      />
+                      <span className="text-[10px] font-black uppercase text-slate-500">{item.payment_method?.toLowerCase()}</span>
+                    </div>
+                    <span className="text-xs font-black text-slate-900">
+                      Rs.{Number(item.total_amount).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Kitchen Type Distribution */}
+            <div className="card-elevated p-8 relative">
+              <div className="mb-6 text-center">
+                <h3 className="text-lg font-black uppercase tracking-tight">Sales by Kitchen Type (Monthly)</h3>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Kitchen-wise distribution</p>
+              </div>
+              <div className="h-[300px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={(reportData?.sales_by_kitchen_type || []).map((p: any) => ({
+                        ...p,
+                        total_amount: parseFloat(String(p.total_amount || 0)) || 0
+                      }))}
+                      dataKey="total_amount"
+                      nameKey="product__category__kitchentype__name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={110}
+                      paddingAngle={5}
+                      stroke="none"
+                      isAnimationActive={false}
+                    >
+                      {(reportData?.sales_by_kitchen_type || []).map((_: any, index: number) => (
+                        <Cell key={`cell-kt-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} className="hover:opacity-80 transition-opacity cursor-pointer" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-black text-slate-800">
+                    Rs.{Number(reportData?.total_month_sales || 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] font-black text-primary uppercase tracking-widest">Kitchen Total</span>
+                </div>
+              </div>
+              <div className="mt-8 space-y-3">
+                {(reportData?.sales_by_kitchen_type || []).map((item: any, index: number) => (
+                  <div key={item.product__category__kitchentype__name} className="flex items-center justify-between px-4 py-2 rounded-xl bg-slate-50/50 border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }}
+                      />
+                      <span className="text-[10px] font-black uppercase text-slate-500">{item.product__category__kitchentype__name || 'other'}</span>
+                    </div>
+                    <span className="text-xs font-black text-slate-900">
+                      Rs.{Number(item.total_amount).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="items" className="space-y-4">
           <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-6">Top Selling Items</h3>
+            <h3 className="text-lg font-semibold mb-6">Top Selling Items (Monthly)</h3>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={topItems} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -318,7 +453,7 @@ export default function AdminReports() {
 
         <TabsContent value="staff" className="space-y-4">
           <div className="card-elevated p-6">
-            <h3 className="text-lg font-semibold mb-6">Staff Performance</h3>
+            <h3 className="text-lg font-semibold mb-6">Staff Performance (Monthly Trend)</h3>
             {staffLoading ? (
               <div className="flex justify-center items-center h-[300px]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

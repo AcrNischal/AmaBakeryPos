@@ -14,7 +14,8 @@ import {
     Globe,
     Loader2,
     BarChart3,
-    WifiOff
+    WifiOff,
+    ShoppingBag
 } from "lucide-react";
 import { useDashboardSSE } from "@/hooks/useDashboardSSE";
 import {
@@ -25,7 +26,9 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Cell
+    Cell,
+    PieChart,
+    Pie
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +42,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { fetchBranches, createBranch, createUser, fetchDashboardDetails } from "../../api/index.js";
@@ -58,12 +62,16 @@ interface Branch {
     revenue?: number;
 }
 
+const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(199, 89%, 48%)'];
+const PAYMENT_COLORS = ['hsl(142, 71%, 45%)', 'hsl(217, 91%, 60%)', 'hsl(32, 95%, 44%)', 'hsl(280, 65%, 60%)', 'hsl(0, 84%, 60%)'];
+
 export default function SuperAdminOverview() {
     const navigate = useNavigate();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [dashboardData, setDashboardData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [sseConnected, setSSEConnected] = useState(false);
@@ -279,11 +287,168 @@ export default function SuperAdminOverview() {
                 </div>
             </div>
 
+            {/* Distribution Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+                {/* Branch Performance */}
+                <div className="card-elevated p-6 border-2 border-slate-50 rounded-[2rem]">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-6">Top Branches (All Time)</h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={(dashboardData?.top_perfomance_branch || []).map((b: any) => ({
+                                    name: b.name || 'Unknown',
+                                    value: parseFloat(String(b.total_sales_per_branch || 0)) || 0
+                                }))}
+                                layout="vertical"
+                                margin={{ left: 10, right: 30 }}
+                            >
+                                <XAxis type="number" hide domain={[0, 'auto']} />
+                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700 }} width={100} />
+                                <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => `Rs. ${Number(v).toLocaleString()}`} />
+                                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Category Breakdown */}
+                <div className="card-elevated p-8 border-2 border-slate-50 rounded-[2.5rem]">
+                    <div className="mb-6">
+                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Sales by Category (All Time)</h3>
+                        <p className="text-xs text-muted-foreground font-medium">Revenue split across food types.</p>
+                    </div>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={(dashboardData?.total_sales_per_category || []).map((item: any) => ({
+                                    name: item.product__category__name || 'Unknown',
+                                    value: parseFloat(String(item.category_total_sales || 0)) || 0,
+                                    percent: parseFloat(String(item.category_percent || 0)) || 0
+                                }))}
+                                layout="vertical"
+                                margin={{ left: 10, right: 30, top: 10, bottom: 10 }}
+                            >
+                                <XAxis type="number" hide domain={[0, 'auto']} />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fontWeight: 800, fill: '#64748b' }}
+                                    width={100}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    formatter={(value: any) => [`Rs. ${Number(value).toLocaleString()}`, 'Sales']}
+                                />
+                                <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24} isAnimationActive={false}>
+                                    {(dashboardData?.total_sales_per_category || []).map((_: any, index: number) => (
+                                        <Cell key={`cell-cat-bar-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-6 flex flex-wrap gap-3 justify-center">
+                        {(dashboardData?.total_sales_per_category || []).map((item: any, index: number) => (
+                            <div key={item.product__category__name} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/80 border border-slate-100 shadow-sm">
+                                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                <span className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">{item.product__category__name}</span>
+                                <span className="text-[10px] font-black text-slate-900 border-l border-slate-200 pl-2 ml-1">{Number(item.category_percent || 0).toFixed(1)}%</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Kitchen Type Breakdown */}
+                <div className="card-elevated p-6 border-2 border-slate-50 rounded-[2rem]">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-6">Kitchen Sales (All Time)</h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={(dashboardData?.sales_by_kitchen_type || []).map((k: any) => ({
+                                        ...k,
+                                        total_amount: parseFloat(String(k.total_amount || 0)) || 0
+                                    }))}
+                                    dataKey="total_amount"
+                                    nameKey="product__category__kitchentype__name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    isAnimationActive={false}
+                                >
+                                    {(dashboardData?.sales_by_kitchen_type || []).map((_: any, index: number) => (
+                                        <Cell key={`cell-kt-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                        {(dashboardData?.sales_by_kitchen_type || []).slice(0, 3).map((item: any, index: number) => (
+                            <div key={item.product__category__kitchentype__name} className="flex items-center justify-between text-[10px]">
+                                <div className="flex items-center gap-1.5 font-bold uppercase">
+                                    <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                    {item.product__category__kitchentype__name || 'other'}
+                                </div>
+                                <span className="font-black">Rs. {Number(item.total_amount).toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Payment Breakdown */}
+                <div className="card-elevated p-6 border-2 border-slate-50 rounded-[2rem]">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-6">Payment Methods (All Time)</h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={(dashboardData?.sales_by_payment_method || []).map((p: any) => ({
+                                        ...p,
+                                        total_amount: parseFloat(String(p.total_amount || 0)) || 0
+                                    }))}
+                                    dataKey="total_amount"
+                                    nameKey="payment_method"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    isAnimationActive={false}
+                                >
+                                    {(dashboardData?.sales_by_payment_method || []).map((_: any, index: number) => (
+                                        <Cell key={`cell-pay-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                        {(dashboardData?.sales_by_payment_method || []).slice(0, 3).map((item: any, index: number) => (
+                            <div key={item.payment_method} className="flex items-center justify-between text-[10px]">
+                                <div className="flex items-center gap-1.5 font-bold uppercase">
+                                    <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }} />
+                                    {item.payment_method?.toLowerCase()}
+                                </div>
+                                <span className="font-black">Rs. {Number(item.total_amount).toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {/* Weekly Sales Chart */}
-            <div className="card-elevated p-6 md:p-8 border-2 border-slate-50 rounded-[2.5rem]">
+            <div className="card-elevated p-6 md:p-8 border-2 border-slate-50 rounded-[2.5rem] mb-6">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Weekly Sales Trend</h3>
+                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Weekly Sales Trend (Current Week)</h3>
                         <p className="text-xs text-muted-foreground font-medium">Performance tracking for the current cycle</p>
                     </div>
                     <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100">
@@ -448,24 +613,55 @@ export default function SuperAdminOverview() {
             {/* Activity Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 card-elevated p-6 md:p-8 border-2 border-slate-50 rounded-[2.5rem]">
-                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-6">Recent HQ Activity</h3>
+                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-6">Recent Orders</h3>
                     <div className="space-y-6">
-                        {[
-                            { user: 'Rajdeep Sharma', action: 'Requested stock transfer for Kathmandu Main', time: '12 mins ago', icon: ArrowUpRight, color: 'text-blue-500', bg: 'bg-blue-50' },
-                            { user: 'System', action: 'Daily revenue reports generated for 3 branches', time: '1 hour ago', icon: Globe, color: 'text-green-500', bg: 'bg-green-50' },
-                            { user: 'Admin', action: 'New staff user added to Pokhara branch', time: '3 hours ago', icon: Users, color: 'text-orange-500', bg: 'bg-orange-50' },
-                        ].map((log, i) => (
-                            <div key={i} className="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100">
-                                <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0", log.bg, log.color)}>
-                                    <log.icon className="h-5 w-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-slate-900">{log.user}</p>
-                                    <p className="text-sm text-slate-500 font-medium leading-relaxed">{log.action}</p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 mt-2">{log.time}</p>
-                                </div>
+                        {(!dashboardData?.recent_orders || dashboardData.recent_orders.length === 0) ? (
+                            <div className="text-center py-10 text-slate-400">
+                                <ShoppingBag className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                                <p className="text-xs font-bold uppercase tracking-widest">No recent network activity</p>
                             </div>
-                        ))}
+                        ) : (
+                            [...(dashboardData?.recent_orders || [])].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((order: any, i: number) => (
+                                <div
+                                    key={order.invoice_number || i}
+                                    className="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer"
+                                    onClick={() => setSelectedOrder(order)}
+                                >
+                                    <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary/5 text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-all")}>
+                                        <ShoppingBag className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <p className="text-sm font-black text-slate-900">
+                                                Order <span className="text-primary">{order.invoice_number}</span>
+                                            </p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                            Processed at <span className="font-bold text-slate-700">{order.branch__name || order.branch_name}</span> by {order.created_by__username || order.created_by_name || 'System'}
+                                        </p>
+                                        <div className="flex items-center gap-3 mt-2">
+                                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 uppercase tracking-tighter">
+                                                Rs. {Number(order.total_amount).toLocaleString()}
+                                            </span>
+                                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-tighter">
+                                                {order.items?.reduce((acc: number, item: any) => acc + (parseFloat(item.quantity) || 0), 0) || 0} Items
+                                            </span>
+                                            <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border",
+                                                order.payment_status === 'PAID'
+                                                    ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                                            )}>
+                                                {order.payment_status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
@@ -613,6 +809,85 @@ export default function SuperAdminOverview() {
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : "Create & Provision"}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Order Detail Modal */}
+            <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Invoice {selectedOrder?.invoice_number}</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedOrder && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Branch</p>
+                                    <p className="font-medium">{selectedOrder.branch_name || selectedOrder.branch__name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Created By</p>
+                                    <p className="font-medium">{selectedOrder.created_by_name || selectedOrder.created_by__username}</p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Date/Time</p>
+                                    <p className="font-medium">{selectedOrder.created_at}</p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Payment Status</p>
+                                    <StatusBadge status={selectedOrder.payment_status.toLowerCase()} />
+                                </div>
+                            </div>
+
+                            {selectedOrder.description && (
+                                <div className="bg-muted/30 p-2 rounded text-xs italic">
+                                    <p className="text-muted-foreground font-bold text-[9px] uppercase mb-1">Description</p>
+                                    {selectedOrder.description}
+                                </div>
+                            )}
+
+                            <div className="border-t pt-4">
+                                <p className="text-xs font-bold uppercase text-muted-foreground mb-2 tracking-widest">Items</p>
+                                <div className="space-y-2">
+                                    {selectedOrder.items?.map((item: any, idx: number) => (
+                                        <div key={idx} className="flex justify-between text-sm">
+                                            <div className="flex flex-col text-left">
+                                                <span className="font-medium">{item.quantity}× {item.product_name}</span>
+                                            </div>
+                                            <span className="font-medium">Rs.{(parseFloat(item.unit_price) * item.quantity).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                    {(!selectedOrder.items || selectedOrder.items.length === 0) && (
+                                        <p className="text-xs text-muted-foreground italic">No items recorded</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border-t pt-4 space-y-1">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Subtotal</span>
+                                    <span>Rs.{selectedOrder.subtotal}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Tax</span>
+                                    <span>Rs.{selectedOrder.tax_amount}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Discount</span>
+                                    <span>-Rs.{selectedOrder.discount}</span>
+                                </div>
+                                <div className="border-t mt-2 pt-2 flex justify-between">
+                                    <span className="font-bold">Total</span>
+                                    <span className="text-xl font-black text-primary">Rs.{selectedOrder.total_amount}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-medium text-success">
+                                    <span>Paid Amount</span>
+                                    <span>Rs.{selectedOrder.paid_amount}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

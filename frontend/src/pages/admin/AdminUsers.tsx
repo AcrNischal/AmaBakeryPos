@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed, Loader2, CookingPot, Check } from "lucide-react";
 import { toast } from "sonner";
-import { fetchUsers, createUser, updateUser, deleteUser } from "../../api/index.js";
+import { fetchUsers, createUser, updateUser, deleteUser, fetchKitchenTypes, createKitchenType } from "../../api/index.js";
 import { ResetPasswordModal } from "../../components/auth/ResetPasswordModal";
+import { Card } from "@/components/ui/card";
 import { getCurrentUser } from "@/auth/auth";
 
 
@@ -20,6 +21,14 @@ interface UserType {
   user_type: string;
   branch?: number;
   branch_name?: string;
+  kitchentype?: number;
+  kitchentype_name?: string;
+}
+
+interface KitchenType {
+  id: number;
+  name: string;
+  branch?: number;
 }
 
 const roleIcons: Record<string, any> = {
@@ -47,6 +56,12 @@ export default function AdminUsers() {
   const [resetTargetUser, setResetTargetUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [kitchenTypes, setKitchenTypes] = useState<KitchenType[]>([]);
+  const [selectedKitchenId, setSelectedKitchenId] = useState<number | null>(null);
+  const [kitchenSearchValue, setKitchenSearchValue] = useState("");
+  const [isKitchenDropdownOpen, setIsKitchenDropdownOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("WAITER");
+
   const currentUser = getCurrentUser();
   const branchId = currentUser?.branch_id ?? null;
 
@@ -62,7 +77,34 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
+    loadKitchens();
   }, [branchId]);
+
+  const loadKitchens = async () => {
+    try {
+      const data = await fetchKitchenTypes();
+      setKitchenTypes(data || []);
+    } catch (err: any) {
+      console.error("Failed to load kitchens", err);
+    }
+  };
+
+  const handleCreateKitchen = async (name: string) => {
+    try {
+      const payload: any = { name };
+      if (branchId) payload.branch = branchId;
+      const res = await createKitchenType(payload);
+      const newKitchen = res.data;
+      setKitchenTypes(prev => [...prev, newKitchen].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedKitchenId(newKitchen.id);
+      setKitchenSearchValue(newKitchen.name);
+      setIsKitchenDropdownOpen(false);
+      toast.success(`Kitchen "${newKitchen.name}" created`);
+      return newKitchen;
+    } catch (err: any) {
+      toast.error("Failed to create kitchen");
+    }
+  };
 
   const loadUsers = async () => {
     setLoading(true);
@@ -103,9 +145,13 @@ export default function AdminUsers() {
     const payload: any = {
       full_name: formData.get("full_name"),
       username: formData.get("username"),
-      user_type: formData.get("user_type"),
+      user_type: selectedRole,
       email: formData.get("email"),
     };
+
+    if (selectedRole === 'KITCHEN' && selectedKitchenId) {
+      payload.kitchentype = selectedKitchenId;
+    }
 
     // When admin/super admin is scoped to a branch, create/update users in that branch
     if (branchId) {
@@ -125,6 +171,9 @@ export default function AdminUsers() {
       }
       setIsDialogOpen(false);
       setEditUser(null);
+      setSelectedKitchenId(null);
+      setKitchenSearchValue("");
+      setSelectedRole("WAITER");
     } catch (err: any) {
       console.error("User operation error:", err);
       const errorMessage = err.message || "Operation failed";
@@ -152,7 +201,13 @@ export default function AdminUsers() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => {
+              setEditUser(null);
+              setSelectedRole("WAITER");
+              setSelectedKitchenId(null);
+              setKitchenSearchValue("");
+              setIsDialogOpen(true);
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Add User
             </Button>
@@ -176,17 +231,87 @@ export default function AdminUsers() {
               </div>
               <div>
                 <Label htmlFor="user_type">Role</Label>
-                <Select name="user_type" defaultValue={editUser?.user_type || 'WAITER'}>
-                  <SelectTrigger>
+                <Select
+                  name="user_type"
+                  value={selectedRole}
+                  onValueChange={(val) => {
+                    setSelectedRole(val);
+                    if (val !== 'KITCHEN') {
+                      setSelectedKitchenId(null);
+                      setKitchenSearchValue("");
+                    }
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl h-12">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="WAITER">Waiter</SelectItem>
                     <SelectItem value="KITCHEN">Kitchen Staff</SelectItem>
                     <SelectItem value="COUNTER">Counter</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedRole === 'KITCHEN' && (
+                <div className="space-y-1 relative">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Assigned Kitchen</Label>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search or type new kitchen..."
+                      value={kitchenSearchValue}
+                      onChange={(e) => {
+                        setKitchenSearchValue(e.target.value);
+                        setIsKitchenDropdownOpen(true);
+                        const match = kitchenTypes.find(k => k.name.toLowerCase() === e.target.value.toLowerCase());
+                        if (match) setSelectedKitchenId(match.id);
+                        else setSelectedKitchenId(null);
+                      }}
+                      onFocus={() => setIsKitchenDropdownOpen(true)}
+                      className="h-12 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 pr-10"
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                      <CookingPot className="h-4 w-4" />
+                    </div>
+
+                    {isKitchenDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[100]" onClick={() => setIsKitchenDropdownOpen(false)} />
+                        <Card className="absolute top-full left-0 right-0 mt-2 z-[110] rounded-xl border border-slate-100 shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto py-2 animate-in fade-in slide-in-from-top-2">
+                          {kitchenTypes
+                            .filter(k => k.name.toLowerCase().includes(kitchenSearchValue.toLowerCase()))
+                            .map(k => (
+                              <button
+                                key={k.id}
+                                type="button"
+                                className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-primary/5 hover:text-primary transition-colors flex items-center justify-between group"
+                                onClick={() => {
+                                  setSelectedKitchenId(k.id);
+                                  setKitchenSearchValue(k.name);
+                                  setIsKitchenDropdownOpen(false);
+                                }}
+                              >
+                                {k.name}
+                                <Check className={cn("h-4 w-4 text-primary", selectedKitchenId === k.id ? "opacity-100" : "opacity-0")} />
+                              </button>
+                            ))}
+
+                          {kitchenSearchValue.trim() && !kitchenTypes.some(k => k.name.toLowerCase() === kitchenSearchValue.toLowerCase()) && (
+                            <button
+                              type="button"
+                              className="w-full text-left px-4 py-3 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-2 border-t border-slate-50"
+                              onClick={() => handleCreateKitchen(kitchenSearchValue.trim())}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Kitchen "{kitchenSearchValue}"
+                            </button>
+                          )}
+                        </Card>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
               {!editUser && (
                 <div>
                   <Label htmlFor="password">Password (Default: amabakery@123)</Label>
@@ -278,6 +403,14 @@ export default function AdminUsers() {
                     className="hover:bg-slate-50 transition-colors group cursor-pointer"
                     onClick={() => {
                       setEditUser(user);
+                      setSelectedRole(user.user_type);
+                      if (user.user_type === 'KITCHEN') {
+                        setSelectedKitchenId(user.kitchentype || null);
+                        setKitchenSearchValue(user.kitchentype_name || "");
+                      } else {
+                        setSelectedKitchenId(null);
+                        setKitchenSearchValue("");
+                      }
                       setIsDialogOpen(true);
                     }}
                   >
@@ -288,7 +421,9 @@ export default function AdminUsers() {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-700">{user.full_name || user.username}</span>
-                          <span className="text-xs text-slate-400">@{user.username}</span>
+                          <span className="text-xs text-slate-400">
+                            @{user.username} {user.kitchentype_name && <span className="text-primary font-black ml-1 uppercase text-[9px] tracking-widest">• {user.kitchentype_name}</span>}
+                          </span>
                         </div>
                       </div>
                     </td>

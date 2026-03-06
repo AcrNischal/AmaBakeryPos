@@ -4,6 +4,7 @@ from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum, Value
 from django.db.models.functions import (
+    Coalesce,
     ExtractHour,
     ExtractWeek,
     ExtractWeekDay,
@@ -15,7 +16,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Branch, Invoice, InvoiceItem, User
+from ..models import Branch, Invoice, InvoiceItem, User, Payment
+from ..serializer_dir.invoice_serializer import InvoiceResponseSerializer
 
 
 class DashboardViewClass(APIView):
@@ -43,6 +45,7 @@ class DashboardViewClass(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Handle SUPER_ADMIN and ADMIN cases
         if role in ["SUPER_ADMIN", "ADMIN"]:
             if not branch_id:
                 # Global summary for network overview
@@ -52,7 +55,7 @@ class DashboardViewClass(APIView):
                 total_count_branch = Branch.objects.all().count()
                 total_count_order = Invoice.objects.all().count()
                 total_user_count = User.objects.all().count()
-                average = total_sum / total_count_order if total_count_order else 0
+                average = float(total_sum) / total_count_order if total_count_order else 0
 
                 today = timezone.now().date()
 
@@ -109,12 +112,11 @@ class DashboardViewClass(APIView):
                         days["sunday"] = item["total_sales"]
 
                 # sales by category pie chart percentage
-
                 if total_sum > 0:
                     sales_per_category = (
                         InvoiceItem.objects.values("product__category__name")
                         .annotate(
-                            total_category_sum=Sum(
+                            category_total_sales=Coalesce(Sum(
                                 ExpressionWrapper(
                                     F("quantity") * F("unit_price")
                                     - F("discount_amount"),
@@ -122,15 +124,15 @@ class DashboardViewClass(APIView):
                                         max_digits=12, decimal_places=2
                                     ),
                                 )
-                            )
+                            ), Value(0.0, output_field=DecimalField()))
                         )
                         .annotate(
-                            category_percent=ExpressionWrapper(
-                                (F("total_category_sum") * 100.0) / Value(total_sum),
+                            category_percent=Coalesce(ExpressionWrapper(
+                                (F("category_total_sales") * 100.0) / Value(total_sum),
                                 output_field=DecimalField(
                                     max_digits=10, decimal_places=2
                                 ),
-                            )
+                            ), Value(0.0, output_field=DecimalField()))
                         )
                     )
                 else:
@@ -139,7 +141,7 @@ class DashboardViewClass(APIView):
                 # branch performance
                 top_performance_branch = (
                     Branch.objects.values("name")
-                    .annotate(total_sales_per_branch=Sum(F("invoices__total_amount")))
+                    .annotate(total_sales_per_branch=Coalesce(Sum("invoices__total_amount"), Value(0.0, output_field=DecimalField())))
                     .order_by("-total_sales_per_branch")[:5]
                 )
 
@@ -150,6 +152,33 @@ class DashboardViewClass(APIView):
                     .order_by("-total_sold_units")[:5]
                 )
 
+                # sales by payment method - FIXED: Added this back
+                sales_by_payment_method = (
+                    Payment.objects.values("payment_method")
+                    .annotate(total_amount=Sum("amount"))
+                    .order_by("-total_amount")
+                )
+
+                # sales by kitchen type
+                sales_by_kitchen_type = (
+                    InvoiceItem.objects.values("product__category__kitchentype__name")
+                    .annotate(total_amount=Coalesce(Sum(
+                        ExpressionWrapper(
+                            F("quantity") * F("unit_price") - F("discount_amount"),
+                            output_field=DecimalField(max_digits=12, decimal_places=2),
+                        )
+                    ), Value(0.0, output_field=DecimalField())))
+                    .order_by("-total_amount")
+                )
+
+                # recent orders across all branches
+                recent_orders_objs = (
+                    Invoice.objects.select_related("branch", "created_by")
+                    .prefetch_related("bills", "bills__product", "payments")
+                    .order_by("-created_at")[:5]
+                )
+                recent_orders = InvoiceResponseSerializer(recent_orders_objs, many=True).data
+
                 return Response(
                     {
                         "success": True,
@@ -158,16 +187,21 @@ class DashboardViewClass(APIView):
                         "total_user": total_user_count - 1,
                         "total_count_order": total_count_order,
                         "average_order_value": average,
-                        "sales_per_category": sales_per_category,
+                        "total_sales_per_category": sales_per_category,
                         "Weekely_Sales": days,
                         "top_perfomance_branch": top_performance_branch,
                         "top_selling_items": top_sold_items,
+                        "sales_by_payment_method": sales_by_payment_method,
+                        "sales_by_kitchen_type": sales_by_kitchen_type,
+                        "recent_orders": recent_orders,
                     },
                     status=status.HTTP_200_OK,
                 )
+            else:
+                # Admin with specific branch_id
+                my_branch = branch_id
 
-            my_branch = branch_id
-
+        # Handle branch-specific dashboard (for BRANCH_MANAGER or ADMIN with branch_id)
         if my_branch:
             # 1.today's total sales amount
             today_invoices = self.date_filter(my_branch, self.todaydate, self.todaydate)
@@ -186,7 +220,6 @@ class DashboardViewClass(APIView):
                 yesterday_sales += invoice.total_amount
 
             if yesterday_sales == 0:
-                sales_percent = today_sales - yesterday_sales
                 sales_percent = today_sales - yesterday_sales
             else:
                 sales_percent = (
@@ -208,7 +241,6 @@ class DashboardViewClass(APIView):
             # 3. avg order value
             if today_total_orders == 0:
                 today_avg_order = 0
-
             else:
                 today_avg_order = Decimal(str((today_sales) / today_total_orders))
 
@@ -245,19 +277,34 @@ class DashboardViewClass(APIView):
             print("Max Orders-> ", max_orders)
 
             # 5.sales by category piechart
+            # Define branch total sum for percentage calculation
+            branch_total_sum = (
+                Invoice.objects.filter(branch=my_branch).aggregate(total=Sum("total_amount"))["total"] or 0
+            )
+
+
             total_sales_per_category = (
                 InvoiceItem.objects.filter(invoice__branch=my_branch)
                 .values("product__category__name")
                 .annotate(
-                    category_total_sales=Sum(
+                    category_total_sales=Coalesce(Sum(
                         ExpressionWrapper(
                             F("quantity") * F("unit_price") - F("discount_amount"),
                             output_field=DecimalField(max_digits=10, decimal_places=2),
                         )
+                    ), Value(0.0, output_field=DecimalField()))
+                )
+            )
+
+            if branch_total_sum > 0:
+                total_sales_per_category = total_sales_per_category.annotate(
+                    category_percent=ExpressionWrapper(
+                        (F("category_total_sales") * 100.0) / Value(branch_total_sum),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
                     )
                 )
-                .order_by("-category_total_sales")[:5]
-            )
+            
+            total_sales_per_category = total_sales_per_category.order_by("-category_total_sales")[:5]
 
             # 6. top selling items
             top_selling_items = (
@@ -266,6 +313,36 @@ class DashboardViewClass(APIView):
                 .annotate(total_orders=Sum("quantity"))
                 .order_by("-total_orders")[:5]
             )
+
+            # 6.5 sales by payment method
+            sales_by_payment_method = (
+                Payment.objects.filter(invoice__branch=my_branch)
+                .values("payment_method")
+                .annotate(total_amount=Sum("amount"))
+                .order_by("-total_amount")
+            )
+
+            # sales by kitchen type
+            sales_by_kitchen_type = (
+                InvoiceItem.objects.filter(invoice__branch=my_branch)
+                .values("product__category__kitchentype__name")
+                .annotate(total_amount=Coalesce(Sum(
+                    ExpressionWrapper(
+                        F("quantity") * F("unit_price") - F("discount_amount"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                ), Value(0.0, output_field=DecimalField())))
+                .order_by("-total_amount")
+            )
+
+            # Recent orders for this branch
+            recent_orders_objs = (
+                Invoice.objects.filter(branch=my_branch)
+                .select_related("branch", "created_by")
+                .prefetch_related("bills", "bills__product", "payments")
+                .order_by("-created_at")[:5]
+            )
+            recent_orders = InvoiceResponseSerializer(recent_orders_objs, many=True).data
 
             # 7. current week sales (Mon–Sun) for the Weekly Sales chart
             today = timezone.now().date()
@@ -350,8 +427,18 @@ class DashboardViewClass(APIView):
                     "top_selling_items": top_selling_items,
                     "Weekely_Sales": branch_days,
                     "Hourly_sales": hourly_sales_branch,
-                }
+                    "sales_by_payment_method": sales_by_payment_method,
+                    "sales_by_kitchen_type": sales_by_kitchen_type,
+                    "recent_orders": recent_orders,  # ADDED
+                },
+                status=status.HTTP_200_OK,
             )
+
+        # Fallback response if no branch is determined
+        return Response(
+            {"success": False, "message": "Unable to determine branch for dashboard"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 def report_dashboard(my_branch):
@@ -376,21 +463,16 @@ def report_dashboard(my_branch):
     )
 
     # average order
-    avg_order_month = current_month_sales / total_orders.count()
+    avg_order_month = current_month_sales / total_orders.count() if total_orders.count() > 0 else 0
 
     print("This is last month->", last_month.month)
 
     # growth percent
-    last_month_sales = Invoice.objects.filter(
-        branch=my_branch, created_at__month=last_month.month
-    )
-
-    for sale in last_month_sales:
-        print(sale)
-    # growth percent
     last_month_sales = (
         Invoice.objects.filter(
-            branch=my_branch, created_at__month=last_month.month
+            branch=my_branch, 
+            created_at__month=last_month.month,
+            created_at__year=last_month.year  # Added year filter for accuracy
         ).aggregate(total_sales=Sum("total_amount"))["total_sales"]
         or 0
     )
@@ -405,9 +487,9 @@ def report_dashboard(my_branch):
     today = timezone.now().date()
 
     start_of_week = today - timedelta(days=today.weekday())  # Monday
-
     end_of_week = start_of_week + timedelta(days=6)
 
+    # FIXED: Removed the annotate with year and week since we're not using them in values
     current_week_data = (
         Invoice.objects.filter(
             branch=my_branch,
@@ -415,15 +497,13 @@ def report_dashboard(my_branch):
             created_at__date__lte=end_of_week,
         )
         .annotate(
-            year=ExtractYear("created_at"),
-            week=ExtractWeek("created_at"),
             weekday=ExtractWeekDay("created_at"),  # 1=Sunday, 2=Monday, ..., 7=Saturday
         )
-        .values("year", "week", "weekday")
+        .values("weekday")
         .annotate(
             total_sales=Sum("total_amount"),
         )
-        .order_by("year", "week", "weekday")
+        .order_by("weekday")
     )
 
     days = {
@@ -494,6 +574,25 @@ def report_dashboard(my_branch):
         .order_by("-total_orders")[:5]
     )
 
+    sales_by_payment_method = (
+        Payment.objects.filter(invoice__branch=my_branch)
+        .values("payment_method")
+        .annotate(total_amount=Sum("amount"))
+        .order_by("-total_amount")
+    )
+
+    sales_by_kitchen_type = (
+        InvoiceItem.objects.filter(invoice__branch=my_branch)
+        .values("product__category__kitchentype__name")
+        .annotate(total_amount=Coalesce(Sum(
+            ExpressionWrapper(
+                F("quantity") * F("unit_price") - F("discount_amount"),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        ), Value(0.0, output_field=DecimalField())))
+        .order_by("-total_amount")
+    )
+
     return {
         "success": True,
         "total_month_sales": current_month_sales,
@@ -503,6 +602,8 @@ def report_dashboard(my_branch):
         "avg_order_month": avg_order_month,
         "top_selling_items_count": top_selling_items_count,
         "growth_percent": growth_percent,
+        "sales_by_payment_method": sales_by_payment_method,
+        "sales_by_kitchen_type": sales_by_kitchen_type,
     }
 
 

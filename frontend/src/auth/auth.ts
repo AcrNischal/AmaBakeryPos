@@ -9,6 +9,8 @@ interface DecodedToken {
   is_staff: boolean;
   branch_id?: number;
   branch_name?: string;
+  kitchentype_id?: number;
+  kitchentype_name?: string;
   exp: number;
 }
 
@@ -72,6 +74,8 @@ export function getCurrentUser() {
       is_staff: decoded.is_staff,
       branch_id: decoded.branch_id,
       branch_name: decoded.branch_name,
+      kitchentype_id: decoded.kitchentype_id,
+      kitchentype_name: decoded.kitchentype_name,
     };
   }
 

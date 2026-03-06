@@ -45,7 +45,7 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
-    kitchentype = models.OneToOneField(Kitchentype,on_delete=CASCADE,blank=True,null=True)
+    kitchentype = models.ForeignKey(Kitchentype, on_delete=models.SET_NULL, blank=True, null=True, related_name="kitchen_users")
 
     USER_TYPE_CHOICES = [
         ("ADMIN", "Admin"),

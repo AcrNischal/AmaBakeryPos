@@ -244,7 +244,7 @@ export default function SuperAdminDashboard() {
                 {/* Activity Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 card-elevated p-6 md:p-8 border-2 border-slate-50 rounded-[2.5rem]">
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-6">Recent HQ Activity</h3>
+                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-6">Recent Orders</h3>
                         <div className="space-y-6">
                             {[
                                 { user: 'Rajdeep Sharma', action: 'Requested stock transfer for Kathmandu Main', time: '12 mins ago', icon: ArrowUpRight, color: 'text-blue-500', bg: 'bg-blue-50' },

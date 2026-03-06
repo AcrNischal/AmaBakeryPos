@@ -678,3 +678,42 @@ export async function fetchInvoicesByCustomer(customerId) {
   if (!res.ok) throw new Error(data?.message || "Failed to fetch invoices for customer");
   return data.data;
 }
+
+// Kitchen Type APIs
+export async function fetchKitchenTypes() {
+  const res = await apiFetch("/api/kitchentype/");
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch kitchen types");
+  return data.data;
+}
+
+export async function createKitchenType(kitchenData) {
+  const res = await apiFetch("/api/kitchentype/", {
+    method: "POST",
+    body: JSON.stringify(kitchenData),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create kitchen type");
+  return data;
+}
+
+export async function updateKitchenType(id, kitchenData) {
+  const res = await apiFetch(`/api/kitchentype/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(kitchenData),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to update kitchen type");
+  return data;
+}
+
+export async function deleteKitchenType(id) {
+  const res = await apiFetch(`/api/kitchentype/${id}/`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const data = await safeJson(res);
+    throw new Error(data?.message || "Failed to delete kitchen type");
+  }
+  return true;
+}

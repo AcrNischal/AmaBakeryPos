@@ -14,6 +14,8 @@ class ProductInvoiceSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
+    kitchentype_name = serializers.CharField(source="category.kitchentype.name", read_only=True)
+    kitchentype_id = serializers.IntegerField(source="category.kitchentype.id", read_only=True)
     branch_name = serializers.CharField(source="category.branch.name", read_only=True)
     branch_id = serializers.IntegerField(source="category.branch.id", read_only=True)
     invoices = ProductInvoiceSerializer(source = "products",many = True, read_only = True )
@@ -30,6 +32,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "low_stock_bar",
             "category",
             "category_name",
+            "kitchentype_id",
+            "kitchentype_name",
             "branch_id",  # ← Use this (read-only through category)
             "branch_name",  # ← Use this (read-only through category)
             "created_at",
@@ -42,6 +46,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "branch_id",
             "branch_name",
             "category_name",
+            "kitchentype_id",
+            "kitchentype_name",
         ]
         extra_kwargs = {
             "name": {"required": True},

@@ -20,12 +20,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if hasattr(user, "branch") and user.branch:
             token["branch_id"] = user.branch.id
             token["branch_name"] = user.branch.name
+            
+        # Add kitchen info if exists
+        if hasattr(user, "kitchentype") and user.kitchentype:
+            token["kitchentype_id"] = user.kitchentype.id
+            token["kitchentype_name"] = user.kitchentype.name
 
         return token
 
 
 class UsersSerializers(serializers.ModelSerializer):
     branch_name = serializers.CharField(source="branch.name", read_only=True)
+    kitchentype_name = serializers.CharField(source="kitchentype.name", read_only=True)
     password = serializers.CharField(
         write_only=True, required=False, style={"input_type": "password"}
     )
@@ -41,11 +47,13 @@ class UsersSerializers(serializers.ModelSerializer):
             "user_type",
             "branch",
             "branch_name",
+            "kitchentype",
+            "kitchentype_name",
             "password",
             "is_staff",
             "date_joined",
         ]
-        read_only_fields = ["id", "is_staff", "date_joined", "branch_name"]
+        read_only_fields = ["id", "is_staff", "date_joined", "branch_name", "kitchentype_name"]
         extra_kwargs = {
             "email": {"required": True},
             "phone": {"allow_blank": True},
@@ -67,6 +75,7 @@ class UsersSerializers(serializers.ModelSerializer):
             full_name=validated_data.get("full_name", ""),
             user_type=validated_data.get("user_type", "WAITER"),
             branch=validated_data.get("branch"),
+            kitchentype=validated_data.get("kitchentype"),
         )
 
         return user

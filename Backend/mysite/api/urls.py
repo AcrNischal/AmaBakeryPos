@@ -13,6 +13,8 @@ urlpatterns = [
     path(
         "category/<int:id>/", views.CategoryViewClass.as_view(), name="Category_details"
     ),
+    path("kitchentype/", views.KitchenView.as_view(), name="Kitchen"),
+    path("kitchentype/<int:id>/", views.KitchenView.as_view(), name="Kitchen_details"),
     path("branch/<int:id>/", views.BranchViewClass.as_view(), name="Branch_details"),
     path("branch/", views.BranchViewClass.as_view(), name="Branch"),
     path("customer/<int:id>/", views.CustomerView.as_view(), name="customer_details"),

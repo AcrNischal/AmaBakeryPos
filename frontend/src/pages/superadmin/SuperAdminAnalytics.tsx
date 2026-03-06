@@ -98,11 +98,10 @@ export default function SuperAdminAnalytics() {
                 <div>
                     <div className="flex items-center gap-3 mb-1">
                         <h1 className="text-3xl font-black tracking-tight text-slate-900">Global Analytics</h1>
-                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${
-                            sseConnected 
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${sseConnected
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                                 : "bg-slate-100 text-slate-400 border-slate-200"
-                        }`}>
+                            }`}>
                             {sseConnected ? (
                                 <>
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -229,35 +228,44 @@ export default function SuperAdminAnalytics() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={data?.sales_per_category || []}
+                                        data={(data?.total_sales_per_category || []).map((item: any) => ({
+                                            ...item,
+                                            category_total_sales: parseFloat(item.category_total_sales || 0)
+                                        }))}
                                         cx="50%"
                                         cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
+                                        innerRadius={65}
+                                        outerRadius={85}
                                         paddingAngle={8}
-                                        dataKey="total_category_sum"
+                                        dataKey="category_total_sales"
                                         nameKey="product__category__name"
+                                        stroke="none"
                                     >
-                                        {(data?.sales_per_category || []).map((_: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        {(data?.total_sales_per_category || []).map((_: any, index: number) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity cursor-pointer" />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        formatter={(value: any) => [`Rs. ${Number(value).toLocaleString()}`, 'Sales']}
+                                    />
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-2xl font-black text-slate-900">100%</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global</span>
+                                <span className="text-xl font-black text-slate-900">
+                                    Rs. {((data?.total_sales || 0) >= 1000 ? ((data?.total_sales || 0) / 1000).toFixed(1) + 'k' : (data?.total_sales || 0)).toLocaleString()}
+                                </span>
+                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Global</span>
                             </div>
                         </div>
                         <div className="w-full mt-6 space-y-2">
-                            {(data?.sales_per_category || []).map((cat: any, idx: number) => (
+                            {(data?.total_sales_per_category || []).map((cat: any, idx: number) => (
                                 <div key={cat.product__category__name} className="flex items-center justify-between">
                                     <div className="flex items-center gap-2.5">
                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                                         <span className="text-xs font-bold text-slate-600 truncate max-w-[120px]">{cat.product__category__name}</span>
                                     </div>
-                                    <span className="text-xs font-black text-slate-900">{cat.category_percent?.toFixed(1)}%</span>
+                                    <span className="text-xs font-black text-slate-900">{parseFloat(cat.category_percent || 0).toFixed(1)}%</span>
                                 </div>
                             ))}
                         </div>

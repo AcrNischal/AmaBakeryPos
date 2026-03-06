@@ -8,7 +8,7 @@ from json import JSONEncoder
 
 from asgiref.sync import sync_to_async
 
-from django.db.models import Count, F, Sum
+from django.db.models import Count, F, Sum, ExpressionWrapper, Value, DecimalField
 from django.db.models.functions import (
     ExtractHour,
     ExtractWeek,
@@ -278,21 +278,26 @@ def get_global_dashboard_data(today):
         elif item["weekday"] == 1:
             days["sunday"] = float(item["total_sales"] or 0)
 
-    # Get top selling items - convert quantities to int
+    # Get top selling items
     top_selling_items = list(
         InvoiceItem.objects.values("product__name")
-        .annotate(total_quantity=Sum("quantity"))
-        .order_by("-total_quantity")[:5]
+        .annotate(total_sold_units=Sum("quantity"))
+        .order_by("-total_sold_units")[:5]
     )
 
-    # Clean up top selling items
-    top_selling_items = [
-        {
-            "product__name": item.get("product__name") or "Unknown",
-            "total_orders": int(item["total_quantity"] or 0),  # Match DashboardView field name
-        }
-        for item in top_selling_items
-    ]
+    # branch performance
+    top_perfomance_branch = list(
+        Branch.objects.values("name")
+        .annotate(total_sales_per_branch=Sum("invoices__total_amount"))
+        .order_by("-total_sales_per_branch")[:5]
+    )
+
+    # sales by payment method
+    sales_by_payment_method = list(
+        Payment.objects.values("payment_method")
+        .annotate(total_amount=Sum("amount"))
+        .order_by("-total_amount")
+    )
 
     # Calculate sales per category for global view
     sales_per_category = []
@@ -338,13 +343,12 @@ def get_global_dashboard_data(today):
         "total_user": total_user_count - 1,
         "total_count_order": total_count_order,
         "average_order_value": float(average),
-        "sales_per_category": sales_per_category,
         "total_sales_per_category": sales_per_category,
         "Weekely_Sales": days,
-        "Weekly_sales": days,
+        "top_perfomance_branch": top_perfomance_branch,
         "top_selling_items": top_selling_items,
-        "recent_activity": recent_activity,
-        "recent_orders": recent_activity,  # Include both to be safe
+        "sales_by_payment_method": sales_by_payment_method,
+        "recent_orders": recent_activity,
         "update_type": "global_update",
         "timestamp": timezone.now().isoformat(),
     }
@@ -414,44 +418,47 @@ def get_branch_dashboard_data(branch_id, today, yesterday):
 
     # Get top selling items for this branch
     top_selling_items = list(
-        InvoiceItem.objects.filter(
-            invoice__branch_id=branch_id, invoice__created_at__date=today
-        )
+        InvoiceItem.objects.filter(invoice__branch_id=branch_id)
         .values("product__name")
-        .annotate(total_quantity=Sum("quantity"))
-        .order_by("-total_quantity")[:5]
+        .annotate(total_orders=Sum("quantity"))
+        .order_by("-total_orders")[:5]
     )
 
-    # Clean up top selling items
-    top_selling_items = [
-        {
-            "product__name": item.get("product__name") or "Unknown",
-            "total_orders": int(item["total_quantity"] or 0),  # Match DashboardView field name
-        }
-        for item in top_selling_items
-    ]
+    # sales by payment method
+    sales_by_payment_method = list(
+        Payment.objects.filter(invoice__branch_id=branch_id)
+        .values("payment_method")
+        .annotate(total_amount=Sum("amount"))
+        .order_by("-total_amount")
+    )
 
-    # Get sales by category - using calculated line_total
-    sales_by_category_query = list(
-        InvoiceItem.objects.filter(
-            invoice__branch_id=branch_id, invoice__created_at__date=today
-        )
+    # Define branch total sum for percentage calculation
+    branch_total_sum = (
+        Invoice.objects.filter(branch_id=branch_id).aggregate(total=Sum("total_amount"))["total"] or 0
+    )
+
+    total_sales_per_category_query = (
+        InvoiceItem.objects.filter(invoice__branch_id=branch_id)
         .values("product__category__name")
         .annotate(
-            total_sales=Sum(F("quantity") * F("unit_price") - F("discount_amount"))
+            category_total_sales=Sum(
+                ExpressionWrapper(
+                    F("quantity") * F("unit_price") - F("discount_amount"),
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                )
+            )
         )
-        .order_by("-total_sales")[:5]
     )
 
-    # Clean up category data and convert to float (Match field 'total_sales_per_category')
-    total_sales_per_category = [
-        {
-            "product__category__name": item.get("product__category__name")
-            or "Uncategorized",
-            "category_total_sales": float(item["total_sales"] or 0),  # Match DashboardView field name
-        }
-        for item in sales_by_category_query
-    ]
+    if branch_total_sum > 0:
+        total_sales_per_category_query = total_sales_per_category_query.annotate(
+            category_percent=ExpressionWrapper(
+                (F("category_total_sales") * 100.0) / Value(branch_total_sum),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+        )
+    
+    total_sales_per_category = list(total_sales_per_category_query.order_by("-category_total_sales")[:5])
 
     # Get recent orders for this branch using serializer
     recent_orders_objs = (
@@ -524,11 +531,10 @@ def get_branch_dashboard_data(branch_id, today, yesterday):
         "avg_orders": round(float(today_avg_order), 2),
         "peak_hours": peak_hours,
         "total_sales_per_category": total_sales_per_category,
-        "sales_by_category": total_sales_per_category,  # Compatibility key
         "top_selling_items": top_selling_items,
+        "sales_by_payment_method": sales_by_payment_method,
         "recent_orders": recent_orders,
         "Weekely_Sales": branch_days,
-        "Weekly_sales": branch_days,
         "Hourly_sales": hourly_sales_branch,
         "update_type": "branch_update",
         "branch_id": branch_id,
