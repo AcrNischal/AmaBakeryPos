@@ -1,7 +1,9 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { useState, useEffect } from "react";
 
 interface OrderCardProps {
   order: any;
@@ -28,6 +30,23 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
   };
 
   const nextStatus = getNextStatus();
+  const [timeAgo, setTimeAgo] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      if (order.createdAt) {
+        try {
+          setTimeAgo(formatDistanceToNow(new Date(order.createdAt), { addSuffix: true }));
+        } catch (e) {
+          setTimeAgo("");
+        }
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, [order.createdAt]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full hover:shadow-lg transition-all duration-300">
@@ -45,8 +64,14 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
         <div className="flex items-center gap-4">
           <span className="text-xs font-black text-slate-400">#{order.id.slice(-3)}</span>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-tight">
               <span>ACTIVE</span>
+              {timeAgo && (
+                <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1 animate-pulse">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span>{timeAgo}</span>
+                </div>
+              )}
             </div>
             {order.waiter && (
               <div className="flex items-center gap-3">

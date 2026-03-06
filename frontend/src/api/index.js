@@ -627,10 +627,16 @@ export async function fetchItemActivity(productId) {
   return data.data;
 }
 
-export async function fetchDashboardDetails(branchId = null) {
-  const url = branchId
+export async function fetchDashboardDetails(branchId = null, filters = {}) {
+  let url = branchId
     ? `/api/calculate/dashboard-details/${branchId}/`
     : `/api/calculate/dashboard-details/`;
+
+  if (filters && Object.keys(filters).length > 0) {
+    const params = new URLSearchParams(filters);
+    url += `?${params.toString()}`;
+  }
+
   const res = await apiFetch(url);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch dashboard details");
@@ -641,24 +647,36 @@ export async function fetchDashboardDetails(branchId = null) {
  * Fetch dashboard stats (alias for fetchDashboardDetails)
  * Use this for polling to keep naming consistent
  */
-export async function fetchDashboardStats(branchId = null) {
-  return fetchDashboardDetails(branchId);
+export async function fetchDashboardStats(branchId = null, filters = {}) {
+  return fetchDashboardDetails(branchId, filters);
 }
 
-export async function fetchReportDashboard(branchId = null) {
-  const url = branchId
+export async function fetchReportDashboard(branchId = null, filters = {}) {
+  let url = branchId
     ? `/api/calculate/report-dashboard/${branchId}/`
     : `/api/calculate/report-dashboard/`;
+
+  if (filters && Object.keys(filters).length > 0) {
+    const params = new URLSearchParams(filters);
+    url += `?${params.toString()}`;
+  }
+
   const res = await apiFetch(url);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch report dashboard");
   return data;
 }
 
-export async function fetchStaffReport(branchId = null) {
-  const url = branchId
+export async function fetchStaffReport(branchId = null, filters = {}) {
+  let url = branchId
     ? `/api/calculate/staff-report/${branchId}/`
     : `/api/calculate/staff-report/`;
+
+  if (filters && Object.keys(filters).length > 0) {
+    const params = new URLSearchParams(filters);
+    url += `?${params.toString()}`;
+  }
+
   const res = await apiFetch(url);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch staff report");
@@ -677,4 +695,43 @@ export async function fetchInvoicesByCustomer(customerId) {
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch invoices for customer");
   return data.data;
+}
+
+// Kitchen Type APIs
+export async function fetchKitchenTypes() {
+  const res = await apiFetch("/api/kitchentype/");
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch kitchen types");
+  return data.data;
+}
+
+export async function createKitchenType(kitchenData) {
+  const res = await apiFetch("/api/kitchentype/", {
+    method: "POST",
+    body: JSON.stringify(kitchenData),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create kitchen type");
+  return data;
+}
+
+export async function updateKitchenType(id, kitchenData) {
+  const res = await apiFetch(`/api/kitchentype/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(kitchenData),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to update kitchen type");
+  return data;
+}
+
+export async function deleteKitchenType(id) {
+  const res = await apiFetch(`/api/kitchentype/${id}/`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const data = await safeJson(res);
+    throw new Error(data?.message || "Failed to delete kitchen type");
+  }
+  return true;
 }

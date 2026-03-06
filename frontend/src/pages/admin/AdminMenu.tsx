@@ -21,10 +21,18 @@ import {
     Tag,
     Store,
     Check,
-    ChevronsUpDown
+    ChevronsUpDown,
+    Utensils,
+    CookingPot,
+    Layers,
+    ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory, updateCategory } from "../../api/index.js";
+import {
+    fetchProducts, createProduct, updateProduct, deleteProduct,
+    fetchCategories, createCategory, deleteCategory, updateCategory,
+    fetchKitchenTypes, createKitchenType, deleteKitchenType, updateKitchenType
+} from "../../api/index.js";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getCurrentUser } from "../../auth/auth";
@@ -44,11 +52,20 @@ interface Product {
     is_available: boolean;
 }
 
+interface KitchenType {
+    id: number;
+    name: string;
+    branch: number;
+    branch_name: string;
+}
+
 interface BackendCategory {
     id: number;
     name: string;
     branch: number;
     branch_name: string;
+    kitchentype: number;
+    kitchentype_name: string;
 }
 
 export default function AdminMenu() {
@@ -56,6 +73,7 @@ export default function AdminMenu() {
     const branchId = user?.branch_id ?? null;
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<BackendCategory[]>([]);
+    const [kitchenTypes, setKitchenTypes] = useState<KitchenType[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
@@ -71,6 +89,13 @@ export default function AdminMenu() {
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
     const [catSearchValue, setCatSearchValue] = useState("");
+    const [isKitchenDialogOpen, setIsKitchenDialogOpen] = useState(false);
+    const [selectedKitchenId, setSelectedKitchenId] = useState<number | null>(null);
+    const [newKitchenInput, setNewKitchenInput] = useState("");
+    const [editingKitchenId, setEditingKitchenId] = useState<number | null>(null);
+    const [editingKitchenName, setEditingKitchenName] = useState("");
+    const [kitchenSearchValue, setKitchenSearchValue] = useState("");
+    const [isKitchenDropdownOpen, setIsKitchenDropdownOpen] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -79,19 +104,27 @@ export default function AdminMenu() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [productsData, categoriesData] = await Promise.all([
+            const [productsData, categoriesData, kitchensData] = await Promise.all([
                 fetchProducts(),
-                fetchCategories()
+                fetchCategories(),
+                fetchKitchenTypes()
             ]);
+
             const scopedProducts = branchId != null
                 ? (productsData || []).filter((p: Product) => p.branch_id === branchId)
                 : productsData || [];
+
             const scopedCategories = branchId != null
                 ? (categoriesData || []).filter((c: BackendCategory) => c.branch === branchId)
                 : categoriesData || [];
 
+            const scopedKitchens = branchId != null
+                ? (kitchensData || []).filter((k: KitchenType) => k.branch === branchId)
+                : kitchensData || [];
+
             setProducts(scopedProducts);
             setCategories(scopedCategories);
+            setKitchenTypes(scopedKitchens);
         } catch (err: any) {
             toast.error(err.message || "Failed to load data");
         } finally {
@@ -200,14 +233,22 @@ export default function AdminMenu() {
 
     const handleAddCategory = async () => {
         if (newCategoryInput.trim()) {
+            if (!selectedKitchenId) {
+                toast.error("Please select a kitchen for this category");
+                return;
+            }
             try {
-                const categoryPayload: any = { name: newCategoryInput.trim() };
+                const categoryPayload: any = {
+                    name: newCategoryInput.trim(),
+                    kitchentype: selectedKitchenId
+                };
                 if (branchId) {
                     categoryPayload.branch = branchId;
                 }
                 const response = await createCategory(categoryPayload);
                 setCategories(prev => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
                 setNewCategoryInput("");
+                setSelectedKitchenId(null);
                 toast.success(response.message || "Category added");
             } catch (err: any) {
                 toast.error(err.message || "Failed to add category");
@@ -217,9 +258,13 @@ export default function AdminMenu() {
     const handleUpdateCategory = async (id: number) => {
         if (!editingCategoryName.trim()) return;
         try {
-            const response = await updateCategory(id, { name: editingCategoryName.trim() });
+            const payload: any = { name: editingCategoryName.trim() };
+            if (selectedKitchenId) payload.kitchentype = selectedKitchenId;
+
+            const response = await updateCategory(id, payload);
             setCategories(prev => prev.map(c => c.id === id ? response.data : c));
             setEditingCategoryId(null);
+            setSelectedKitchenId(null);
             toast.success(response.message || "Category updated");
         } catch (err: any) {
             toast.error(err.message || "Failed to update category");
@@ -244,6 +289,64 @@ export default function AdminMenu() {
         }
     };
 
+    const handleAddKitchen = async (overrideName?: string) => {
+        const nameToUse = overrideName || newKitchenInput.trim();
+        if (!nameToUse) {
+            toast.error("Please enter a kitchen name");
+            return;
+        }
+        try {
+            const payload: any = { name: nameToUse };
+            if (branchId) payload.branch = branchId;
+            // Fallback for Super Admin if branchId is null: try to find any branch
+            if (!payload.branch && user?.role === 'SUPER_ADMIN') {
+                // If we have categories or products with branches, we could infer,
+                // but better to just ask or use the first available. 
+                // For now, let's assume branchId should be set or the backend will handle.
+            }
+
+            const response = await createKitchenType(payload);
+            const newKitchen = response.data;
+            setKitchenTypes(prev => [...prev, newKitchen].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewKitchenInput("");
+            setKitchenSearchValue(newKitchen.name);
+            setSelectedKitchenId(newKitchen.id);
+            toast.success(`Kitchen "${newKitchen.name}" added`);
+            return newKitchen;
+        } catch (err: any) {
+            console.error("Add Kitchen Error:", err);
+            toast.error(err.message || "Failed to add kitchen");
+        }
+    };
+
+    const handleUpdateKitchen = async (id: number) => {
+        if (!editingKitchenName.trim()) return;
+        try {
+            const response = await updateKitchenType(id, { name: editingKitchenName.trim() });
+            setKitchenTypes(prev => prev.map(k => k.id === id ? response.data : k));
+            setEditingKitchenId(null);
+            toast.success("Kitchen updated");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update kitchen");
+        }
+    };
+
+    const handleDeleteKitchen = async (id: number, name: string) => {
+        const isInUse = categories.some(cat => cat.kitchentype === id);
+        if (isInUse) {
+            toast.error("Cannot delete kitchen with attached categories");
+            return;
+        }
+        if (!confirm(`Delete kitchen "${name}"?`)) return;
+        try {
+            await deleteKitchenType(id);
+            setKitchenTypes(prev => prev.filter(k => k.id !== id));
+            toast.success("Kitchen deleted");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to delete kitchen");
+        }
+    };
+
     return (
         <div className="p-4 md:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -255,9 +358,10 @@ export default function AdminMenu() {
 
             <Tabs defaultValue="items" className="w-full">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4">
-                    <TabsList className="grid w-full grid-cols-2 max-w-full sm:max-w-[300px]">
+                    <TabsList className="grid w-full grid-cols-3 max-w-full sm:max-w-[450px]">
                         <TabsTrigger value="items">Menu Items</TabsTrigger>
                         <TabsTrigger value="categories">Categories</TabsTrigger>
+                        <TabsTrigger value="kitchens">Kitchens</TabsTrigger>
                     </TabsList>
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -318,7 +422,7 @@ export default function AdminMenu() {
                                                     className="fixed inset-0 z-[100]"
                                                     onClick={() => setIsCatDropdownOpen(false)}
                                                 />
-                                                <Card className="absolute top-full left-0 right-0 mt-2 z-[110] rounded-2xl border border-slate-100 shadow-2xl overflow-hidden max-h-[250px] overflow-y-auto scrollbar-hide py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <Card className="absolute top-full left-0 right-0 mt-2 z-[110] rounded-2xl border border-slate-100 shadow-2xl overflow-hidden max-h-[300px] overflow-y-auto scrollbar-hide py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                                                     {categories
                                                         .filter(cat => cat.name.toLowerCase().includes(catSearchValue.toLowerCase()))
                                                         .map(cat => (
@@ -332,41 +436,114 @@ export default function AdminMenu() {
                                                                     setIsCatDropdownOpen(false);
                                                                 }}
                                                             >
-                                                                <span>{cat.name}</span>
+                                                                <div className="flex flex-col">
+                                                                    <span>{cat.name}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter flex items-center gap-1">
+                                                                        <CookingPot className="h-2.5 w-2.5" />
+                                                                        {cat.kitchentype_name}
+                                                                    </span>
+                                                                </div>
                                                                 <Check className={cn("h-4 w-4 text-primary", selectedCategoryId === cat.id ? "opacity-100" : "opacity-0")} />
                                                             </button>
                                                         ))}
 
                                                     {catSearchValue.trim() && !categories.some(c => c.name.toLowerCase() === catSearchValue.toLowerCase()) && (
-                                                        <button
-                                                            type="button"
-                                                            className="w-full text-left px-4 py-3 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-2 border-t border-slate-50"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const catPayload: any = { name: catSearchValue.trim() };
-                                                                    if (branchId) {
-                                                                        catPayload.branch = branchId;
-                                                                    }
-                                                                    const response = await createCategory(catPayload);
-                                                                    const newCat = response.data;
-                                                                    setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
-                                                                    setSelectedCategoryId(newCat.id);
-                                                                    setCatSearchValue(newCat.name);
-                                                                    setIsCatDropdownOpen(false);
-                                                                    toast.success(`Category "${newCat.name}" added`);
-                                                                } catch (err: any) {
-                                                                    toast.error(err.message || "Failed to add category");
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Plus className="h-4 w-4" />
-                                                            Add "{catSearchValue}"
-                                                        </button>
-                                                    )}
+                                                        <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-4">
+                                                            <div className="space-y-3">
+                                                                <p className="text-[10px] font-black uppercase text-slate-400">Assign Category to Kitchen</p>
+                                                                <div className="relative">
+                                                                    <Input
+                                                                        placeholder="Search or type new kitchen..."
+                                                                        value={kitchenSearchValue}
+                                                                        onChange={(e) => {
+                                                                            setKitchenSearchValue(e.target.value);
+                                                                            setIsKitchenDropdownOpen(true);
+                                                                            const match = kitchenTypes.find(k => k.name.toLowerCase() === e.target.value.toLowerCase());
+                                                                            if (match) setSelectedKitchenId(match.id);
+                                                                            else setSelectedKitchenId(null);
+                                                                        }}
+                                                                        onFocus={() => setIsKitchenDropdownOpen(true)}
+                                                                        className="h-10 rounded-xl bg-white pr-10"
+                                                                    />
+                                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                                                        <CookingPot className="h-4 w-4" />
+                                                                    </div>
 
-                                                    {catSearchValue.trim() === "" && categories.length === 0 && (
-                                                        <div className="px-4 py-8 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">
-                                                            No categories found
+                                                                    {isKitchenDropdownOpen && (
+                                                                        <>
+                                                                            <div className="fixed inset-0 z-[120]" onClick={() => setIsKitchenDropdownOpen(false)} />
+                                                                            <Card className="absolute top-full left-0 right-0 mt-1 z-[130] rounded-xl border border-slate-100 shadow-xl overflow-hidden max-h-[200px] overflow-y-auto py-1 animate-in fade-in slide-in-from-top-1">
+                                                                                {kitchenTypes
+                                                                                    .filter(k => k.name.toLowerCase().includes(kitchenSearchValue.toLowerCase()))
+                                                                                    .map(k => (
+                                                                                        <button
+                                                                                            key={k.id}
+                                                                                            type="button"
+                                                                                            className="w-full text-left px-4 py-2 text-sm font-bold hover:bg-primary/5 hover:text-primary transition-colors flex items-center justify-between"
+                                                                                            onClick={() => {
+                                                                                                setSelectedKitchenId(k.id);
+                                                                                                setKitchenSearchValue(k.name);
+                                                                                                setIsKitchenDropdownOpen(false);
+                                                                                            }}
+                                                                                        >
+                                                                                            {k.name}
+                                                                                            <Check className={cn("h-4 w-4 text-primary", selectedKitchenId === k.id ? "opacity-100" : "opacity-0")} />
+                                                                                        </button>
+                                                                                    ))}
+
+                                                                                {kitchenSearchValue.trim() && !kitchenTypes.some(k => k.name.toLowerCase() === kitchenSearchValue.toLowerCase()) && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="w-full text-left px-4 py-2 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-2 border-t border-slate-50"
+                                                                                        onClick={async () => {
+                                                                                            const newK = await handleAddKitchen(kitchenSearchValue.trim());
+                                                                                            if (newK) {
+                                                                                                setSelectedKitchenId(newK.id);
+                                                                                                setKitchenSearchValue(newK.name);
+                                                                                                setIsKitchenDropdownOpen(false);
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        <Plus className="h-3 w-3" />
+                                                                                        Add Kitchen "{kitchenSearchValue}"
+                                                                                    </button>
+                                                                                )}
+                                                                            </Card>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                className="w-full h-10 rounded-xl font-black text-xs uppercase mt-2"
+                                                                onClick={async () => {
+                                                                    if (!selectedKitchenId) {
+                                                                        toast.error("Please select or create a kitchen for the new category");
+                                                                        return;
+                                                                    }
+                                                                    try {
+                                                                        const catPayload: any = {
+                                                                            name: catSearchValue.trim(),
+                                                                            kitchentype: selectedKitchenId
+                                                                        };
+                                                                        if (branchId) {
+                                                                            catPayload.branch = branchId;
+                                                                        }
+                                                                        const response = await createCategory(catPayload);
+                                                                        const newCat = response.data;
+                                                                        setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+                                                                        setSelectedCategoryId(newCat.id);
+                                                                        setCatSearchValue(newCat.name);
+                                                                        setIsCatDropdownOpen(false);
+                                                                        toast.success(`Category "${newCat.name}" added to ${newCat.kitchentype_name}`);
+                                                                    } catch (err: any) {
+                                                                        toast.error(err.message || "Failed to add category");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                                                Create Category
+                                                            </Button>
                                                         </div>
                                                     )}
                                                 </Card>
@@ -515,7 +692,14 @@ export default function AdminMenu() {
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 className="font-bold text-slate-900 text-lg leading-snug group-hover:text-primary transition-colors">{item.name}</h3>
-                                            <p className="text-[11px] uppercase font-black tracking-widest text-slate-400 mt-0.5">{item.category_name}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <p className="text-[11px] uppercase font-black tracking-widest text-slate-400 underline decoration-slate-200 decoration-2 underline-offset-2">{item.category_name}</p>
+                                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                                <p className="text-[10px] uppercase font-black tracking-widest text-primary/60 flex items-center gap-1">
+                                                    <CookingPot className="h-3 w-3" />
+                                                    {categories.find(c => c.id === item.category)?.kitchentype_name || 'No Kitchen'}
+                                                </p>
+                                            </div>
                                         </div>
                                         <span className="text-xl font-black text-primary">Rs.{item.selling_price}</span>
                                     </div>
@@ -571,57 +755,329 @@ export default function AdminMenu() {
                 </TabsContent>
 
                 <TabsContent value="categories" className="space-y-6 mt-6">
+                    <div className="card-elevated p-8 max-w-4xl mx-auto shadow-2xl rounded-[2.5rem] border-4 border-white">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h2 className="text-3xl font-black flex items-center gap-3 uppercase tracking-tighter text-slate-800">
+                                    <Layers className="h-8 w-8 text-primary" />
+                                    Manage Categories
+                                </h2>
+                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1 ml-1">Organize your menu stations</p>
+                            </div>
+                            <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-widest">
+                                {categories.length} Categories
+                            </Badge>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 mb-10 shadow-inner">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 ml-1 block">Create New Category</Label>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                <div className="md:col-span-5 space-y-1.5">
+                                    <Input
+                                        placeholder="Category Name (e.g. Burgers, Drinks)"
+                                        value={newCategoryInput}
+                                        onChange={(e) => setNewCategoryInput(e.target.value)}
+                                        className="h-14 text-lg shadow-sm border-slate-200 focus:border-primary focus:ring-primary rounded-2xl bg-white px-5 font-bold"
+                                    />
+                                </div>
+                                <div className="md:col-span-4 space-y-1.5 relative">
+                                    <div className="relative">
+                                        <Input
+                                            placeholder="Select Kitchen Station..."
+                                            value={kitchenSearchValue}
+                                            onChange={(e) => {
+                                                setKitchenSearchValue(e.target.value);
+                                                setIsKitchenDropdownOpen(true);
+                                                const match = kitchenTypes.find(k => k.name.toLowerCase() === e.target.value.toLowerCase());
+                                                if (match) setSelectedKitchenId(match.id);
+                                                else setSelectedKitchenId(null);
+                                            }}
+                                            onFocus={() => setIsKitchenDropdownOpen(true)}
+                                            className="h-14 rounded-2xl bg-white border border-slate-200 focus:ring-2 focus:ring-primary/20 pr-12 font-bold text-slate-700"
+                                        />
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">
+                                            <CookingPot className="h-6 w-6" />
+                                        </div>
+
+                                        {isKitchenDropdownOpen && (
+                                            <>
+                                                <div className="fixed inset-0 z-[100]" onClick={() => setIsKitchenDropdownOpen(false)} />
+                                                <Card className="absolute top-full left-0 right-0 mt-3 z-[110] rounded-[1.5rem] border border-slate-100 shadow-2xl overflow-hidden max-h-[300px] overflow-y-auto py-2 animate-in fade-in slide-in-from-top-3">
+                                                    <div className="px-4 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">Available Stations</div>
+                                                    {kitchenTypes
+                                                        .filter(k => k.name.toLowerCase().includes(kitchenSearchValue.toLowerCase()))
+                                                        .map(k => (
+                                                            <button
+                                                                key={k.id}
+                                                                type="button"
+                                                                className="w-full text-left px-5 py-3.5 text-sm font-bold hover:bg-primary/5 hover:text-primary transition-all flex items-center justify-between group"
+                                                                onClick={() => {
+                                                                    setSelectedKitchenId(k.id);
+                                                                    setKitchenSearchValue(k.name);
+                                                                    setIsKitchenDropdownOpen(false);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                                                                        <CookingPot className="h-4 w-4 opacity-40 group-hover:opacity-100" />
+                                                                    </div>
+                                                                    {k.name}
+                                                                </div>
+                                                                <div className={cn("h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center transition-all", selectedKitchenId === k.id ? "scale-100 opacity-100" : "scale-50 opacity-0")}>
+                                                                    <Check className="h-3 w-3 text-primary" />
+                                                                </div>
+                                                            </button>
+                                                        ))}
+
+                                                    {kitchenSearchValue.trim() && !kitchenTypes.some(k => k.name.toLowerCase() === kitchenSearchValue.toLowerCase()) && (
+                                                        <button
+                                                            type="button"
+                                                            className="w-full text-left px-5 py-4 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-3 border-t border-slate-100 mt-2"
+                                                            onClick={async () => {
+                                                                const newK = await handleAddKitchen(kitchenSearchValue.trim());
+                                                                if (newK) {
+                                                                    setSelectedKitchenId(newK.id);
+                                                                    setKitchenSearchValue(newK.name);
+                                                                    setIsKitchenDropdownOpen(false);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                                <Plus className="h-5 w-5" />
+                                                            </div>
+                                                            Add New Kitchen "{kitchenSearchValue}"
+                                                        </button>
+                                                    )}
+                                                </Card>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <Button
+                                        onClick={handleAddCategory}
+                                        className="h-14 w-full font-black shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all rounded-2xl text-base gap-2"
+                                    >
+                                        <Plus className="h-5 w-5" />
+                                        Add Category
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-12 gap-4 px-8 py-4 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50/50 rounded-2xl border border-slate-100/50">
+                                <div className="col-span-5">Category Name</div>
+                                <div className="col-span-4">Assigned Station</div>
+                                <div className="col-span-3 text-right">Row Actions</div>
+                            </div>
+                            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-slate-200">
+                                {categories.map((category) => (
+                                    <div
+                                        key={category.id}
+                                        className={cn(
+                                            "p-2 bg-white hover:bg-slate-50/50 transition-all rounded-[1.75rem] border-2 group",
+                                            editingCategoryId === category.id ? "border-primary/20 shadow-xl bg-slate-50/80" : "border-slate-100 shadow-sm hover:border-slate-200"
+                                        )}
+                                    >
+                                        <div className="grid grid-cols-12 gap-4 items-center pl-6 pr-4 py-2">
+                                            <div className="col-span-12 md:col-span-5">
+                                                {editingCategoryId === category.id ? (
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[9px] font-black uppercase text-slate-400 ml-1">Rename Category</Label>
+                                                        <Input
+                                                            value={editingCategoryName}
+                                                            onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                            className="h-12 text-lg rounded-xl focus:ring-primary font-bold bg-white"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:text-primary transition-all">
+                                                            <Layers className="h-5 w-5" />
+                                                        </div>
+                                                        <div className="font-black text-slate-700 text-lg tracking-tight capitalize">{category.name}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="col-span-12 md:col-span-4">
+                                                {editingCategoryId === category.id ? (
+                                                    <div className="space-y-1 relative">
+                                                        <Label className="text-[9px] font-black uppercase text-slate-400 ml-1">Change Station</Label>
+                                                        <div className="relative">
+                                                            <Input
+                                                                placeholder="Search Kitchen..."
+                                                                value={kitchenSearchValue}
+                                                                onChange={(e) => {
+                                                                    setKitchenSearchValue(e.target.value);
+                                                                    setIsKitchenDropdownOpen(true);
+                                                                    const match = kitchenTypes.find(k => k.name.toLowerCase() === e.target.value.toLowerCase());
+                                                                    if (match) setSelectedKitchenId(match.id);
+                                                                    else setSelectedKitchenId(null);
+                                                                }}
+                                                                onFocus={() => {
+                                                                    setIsKitchenDropdownOpen(true);
+                                                                    setKitchenSearchValue(category.kitchentype_name);
+                                                                    setSelectedKitchenId(category.kitchentype);
+                                                                }}
+                                                                className="h-12 rounded-xl bg-white pr-10 font-bold"
+                                                            />
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                                                <ChevronDown className="h-4 w-4" />
+                                                            </div>
+                                                            {isKitchenDropdownOpen && (
+                                                                <>
+                                                                    <div className="fixed inset-0 z-[100]" onClick={() => setIsKitchenDropdownOpen(false)} />
+                                                                    <Card className="absolute top-full left-0 right-0 mt-2 z-[110] rounded-2xl border border-slate-100 shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto py-2">
+                                                                        {kitchenTypes
+                                                                            .filter(k => k.name.toLowerCase().includes(kitchenSearchValue.toLowerCase()))
+                                                                            .map(k => (
+                                                                                <button
+                                                                                    key={k.id}
+                                                                                    type="button"
+                                                                                    className="w-full text-left px-5 py-3 text-sm font-bold hover:bg-primary/5 hover:text-primary transition-all flex items-center justify-between"
+                                                                                    onClick={() => {
+                                                                                        setSelectedKitchenId(k.id);
+                                                                                        setKitchenSearchValue(k.name);
+                                                                                        setIsKitchenDropdownOpen(false);
+                                                                                    }}
+                                                                                >
+                                                                                    {k.name}
+                                                                                    <div className={cn("h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center", selectedKitchenId === k.id ? "opacity-100" : "opacity-0")}>
+                                                                                        <Check className="h-2.5 w-2.5 text-primary" />
+                                                                                    </div>
+                                                                                </button>
+                                                                            ))}
+                                                                    </Card>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <Badge variant="outline" className="font-black bg-primary/5 text-primary border-primary/10 px-4 py-1.5 rounded-xl flex items-center gap-2 w-fit text-[10px] uppercase tracking-widest shadow-sm">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                                        {category.kitchentype_name}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="col-span-12 md:col-span-3 text-right flex justify-end items-center gap-2">
+                                                {editingCategoryId === category.id ? (
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => handleUpdateCategory(category.id)}
+                                                            className="h-11 rounded-xl px-5 font-black uppercase text-xs tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200/50"
+                                                        >
+                                                            Save Changes
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => { setEditingCategoryId(null); setSelectedKitchenId(null); }}
+                                                            className="h-11 rounded-xl px-4 font-bold text-slate-500 hover:bg-slate-100"
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-11 w-11 rounded-xl bg-slate-50 text-slate-400 hover:text-primary hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-slate-100"
+                                                            onClick={() => {
+                                                                setEditingCategoryId(category.id);
+                                                                setEditingCategoryName(category.name);
+                                                                setSelectedKitchenId(category.kitchentype);
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-5 w-5" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-11 w-11 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-white hover:shadow-md transition-all border border-transparent hover:border-slate-100"
+                                                            onClick={() => handleDeleteCategory(category.id, category.name)}
+                                                        >
+                                                            <Trash2 className="h-5 w-5" />
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {categories.length === 0 && (
+                                    <div className="py-20 text-center bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                                        <div className="h-16 w-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-300">
+                                            <Layers className="h-8 w-8" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-slate-800">No Categories Found</h3>
+                                        <p className="text-slate-400 font-bold text-sm tracking-tight mt-1">Start by adding your first menu category above.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="kitchens" className="space-y-6 mt-6">
                     <div className="card-elevated p-8 max-w-2xl mx-auto shadow-2xl rounded-[2.5rem]">
                         <h2 className="text-2xl font-black mb-6 flex items-center gap-2 uppercase tracking-tight">
-                            Manage Categories
+                            <CookingPot className="h-6 w-6 text-primary" />
+                            Manage Kitchens
                         </h2>
                         <div className="flex gap-3 mb-8">
                             <Input
-                                placeholder="Enter new category name..."
-                                value={newCategoryInput}
-                                onChange={(e) => setNewCategoryInput(e.target.value)}
+                                placeholder="Enter kitchen name (e.g. Main Kitchen, Bakery)..."
+                                value={newKitchenInput}
+                                onChange={(e) => setNewKitchenInput(e.target.value)}
                                 className="h-12 text-lg shadow-sm border-slate-200 focus:border-primary focus:ring-primary rounded-2xl"
                             />
-                            <Button onClick={handleAddCategory} className="h-12 px-6 font-bold shadow-md hover:shadow-lg transition-all rounded-2xl">
+                            <Button onClick={() => handleAddKitchen()} className="h-12 px-6 font-bold shadow-md hover:shadow-lg transition-all rounded-2xl">
                                 <Plus className="h-5 w-5 mr-2" />
-                                Add New
+                                Add Kitchen
                             </Button>
                         </div>
 
                         <div className="space-y-3">
                             <div className="grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                                <div className="col-span-8">Category Name</div>
+                                <div className="col-span-8">Kitchen Name</div>
                                 <div className="col-span-4 text-right pr-2">Actions</div>
                             </div>
                             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-                                {categories.map((category) => (
-                                    <div key={category.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-slate-50 hover:bg-white hover:shadow-md hover:border-slate-200 transition-all rounded-2xl border border-transparent group">
+                                {kitchenTypes.map((kitchen) => (
+                                    <div key={kitchen.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-slate-50 hover:bg-white hover:shadow-md hover:border-slate-200 transition-all rounded-2xl border border-transparent group">
                                         <div className="col-span-8">
-                                            {editingCategoryId === category.id ? (
+                                            {editingKitchenId === kitchen.id ? (
                                                 <div className="flex gap-2">
                                                     <Input
-                                                        value={editingCategoryName}
-                                                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                        value={editingKitchenName}
+                                                        onChange={(e) => setEditingKitchenName(e.target.value)}
                                                         className="h-10 text-lg rounded-xl focus:ring-primary"
                                                         autoFocus
                                                     />
-                                                    <Button size="sm" onClick={() => handleUpdateCategory(category.id)} className="h-10 rounded-xl px-4">Save</Button>
-                                                    <Button size="sm" variant="ghost" onClick={() => setEditingCategoryId(null)} className="h-10 rounded-xl px-4">Cancel</Button>
+                                                    <Button size="sm" onClick={() => handleUpdateKitchen(kitchen.id)} className="h-10 rounded-xl px-4">Save</Button>
+                                                    <Button size="sm" variant="ghost" onClick={() => setEditingKitchenId(null)} className="h-10 rounded-xl px-4">Cancel</Button>
                                                 </div>
                                             ) : (
-                                                <div className="font-bold text-slate-700 text-lg">{category.name}</div>
+                                                <div className="font-bold text-slate-700 text-lg flex items-center gap-2">
+                                                    <Utensils className="h-4 w-4 text-slate-400" />
+                                                    {kitchen.name}
+                                                </div>
                                             )}
                                         </div>
                                         <div className="col-span-4 text-right flex justify-end gap-1">
-                                            {editingCategoryId !== category.id && (
+                                            {editingKitchenId !== kitchen.id && (
                                                 <>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="text-slate-400 hover:text-primary hover:bg-primary/5 opacity-0 group-hover:opacity-100 transition-all rounded-xl h-10 w-10"
                                                         onClick={() => {
-                                                            setEditingCategoryId(category.id);
-                                                            setEditingCategoryName(category.name);
+                                                            setEditingKitchenId(kitchen.id);
+                                                            setEditingKitchenName(kitchen.name);
                                                         }}
                                                     >
                                                         <Pencil className="h-5 w-5" />
@@ -630,7 +1086,7 @@ export default function AdminMenu() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all rounded-xl h-10 w-10"
-                                                        onClick={() => handleDeleteCategory(category.id, category.name)}
+                                                        onClick={() => handleDeleteKitchen(kitchen.id, kitchen.name)}
                                                     >
                                                         <Trash2 className="h-5 w-5" />
                                                     </Button>
@@ -639,16 +1095,16 @@ export default function AdminMenu() {
                                         </div>
                                     </div>
                                 ))}
-                                {categories.length === 0 && (
+                                {kitchenTypes.length === 0 && (
                                     <div className="py-12 text-center text-slate-400 font-medium">
-                                        No categories added yet.
+                                        No kitchens added yet.
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
                 </TabsContent>
-            </Tabs>
-        </div>
+            </Tabs >
+        </div >
     );
 }

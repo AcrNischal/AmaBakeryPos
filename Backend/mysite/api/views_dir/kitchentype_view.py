@@ -9,45 +9,68 @@ class KitchenViewClass(APIView):
     def get_user_role(self, user):
         return "SUPER_ADMIN" if user.is_superuser else getattr(user, "user_type", "")
 
-
-    def get(self,request,id=None):
+    def get(self, request, id=None):
         my_branch = request.user.branch
         role = self.get_user_role(request.user)
-
 
         if id:
-            if not role in ["ADMIN","SUPER_ADMIN"]:
-                if my_branch:
-                    kitchentype = Kitchentype.objects.filter(id=id,branch=my_branch)
-                    serilizer = KitchenTypeSerializer(kitchentype)
-                    return Response({"success":True,"data" :serilizer.data})
-
+            filter_kwargs = {"id": id}
+            if role not in ["ADMIN", "SUPER_ADMIN"] and my_branch:
+                filter_kwargs["branch"] = my_branch
+            
+            kitchentype = get_object_or_404(Kitchentype, **filter_kwargs)
+            serializer = KitchenTypeSerializer(kitchentype)
+            return Response({"success": True, "data": serializer.data})
         else:
-            if role in ["ADMIN","SUPER_ADMIN"]:
-                kitchentype = Kitchentype.objects.all()
-                serilizer = KitchenTypeSerializer(kitchentype)
-                return Response({"success":True,"data" :serilizer.data})
+            if role in ["ADMIN", "SUPER_ADMIN"]:
+                kitchentypes = Kitchentype.objects.all()
+            elif my_branch:
+                kitchentypes = Kitchentype.objects.filter(branch=my_branch)
+            else:
+                kitchentypes = Kitchentype.objects.none()
+            
+            serializer = KitchenTypeSerializer(kitchentypes, many=True)
+            return Response({"success": True, "data": serializer.data})
 
-
-
-
-        return Response({"success":True,"data" :serilizer.data})
-
-    def post(self,request):
+    def post(self, request):
         my_branch = request.user.branch
         role = self.get_user_role(request.user)
 
+        data = request.data.copy()
+        if role not in ["ADMIN", "SUPER_ADMIN"]:
+            if not my_branch:
+                return Response({"success": False, "message": "Branch is required"}, status=status.HTTP_400_BAD_REQUEST)
+            data["branch"] = my_branch.id
 
+        serializer = KitchenTypeSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"success": True, "data": serializer.data, "message": "Kitchen type created"}, status=status.HTTP_201_CREATED)
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+    def patch(self, request, id):
+        my_branch = request.user.branch
+        role = self.get_user_role(request.user)
 
-
+        filter_kwargs = {"id": id}
+        if role not in ["ADMIN", "SUPER_ADMIN"] and my_branch:
+            filter_kwargs["branch"] = my_branch
         
+        kitchentype = get_object_or_404(Kitchentype, **filter_kwargs)
+        serializer = KitchenTypeSerializer(kitchentype, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"success": True, "data": serializer.data, "message": "Kitchen type updated"})
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request, id):
+        my_branch = request.user.branch
+        role = self.get_user_role(request.user)
+
+        filter_kwargs = {"id": id}
+        if role not in ["ADMIN", "SUPER_ADMIN"] and my_branch:
+            filter_kwargs["branch"] = my_branch
         
-
-
-
-
-        # if id:
-
-
+        kitchentype = get_object_or_404(Kitchentype, **filter_kwargs)
+        kitchentype.delete()
+        return Response({"success": True, "message": "Kitchen type deleted"}, status=status.HTTP_204_NO_CONTENT)

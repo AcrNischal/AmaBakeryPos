@@ -45,7 +45,7 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
-    kitchentype = models.OneToOneField(Kitchentype,on_delete=CASCADE,blank=True,null=True)
+    kitchentype = models.ForeignKey(Kitchentype, on_delete=models.SET_NULL, blank=True, null=True, related_name="kitchen_users")
 
     USER_TYPE_CHOICES = [
         ("ADMIN", "Admin"),
@@ -170,6 +170,7 @@ class Invoice(models.Model):
         max_length=10, choices=INVOICE_TYPE_CHOICES, default="SALE"
     )
     created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="created_invoices"
     )

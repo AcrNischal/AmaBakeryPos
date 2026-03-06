@@ -19,6 +19,7 @@ from .views_dir.invoice_view import InvoiceViewClass
 from .views_dir.dashboard_view import DashboardViewClass, ReportDashboardViewClass
 from .views_dir.staff_view import StaffReportViewClass
 from .views_dir.payment_view import PaymentClassView
+from .views_dir.kitchentype_view import KitchenViewClass
 
 # custom
 from .views_dir.product_view import ProductViewClass
@@ -132,4 +133,5 @@ ItemActivityView = item_activity_view.ItemActivityClassView
 DashboardView = DashboardViewClass
 ReportDashboardView = ReportDashboardViewClass
 StaffReportView = StaffReportViewClass
+KitchenView = KitchenViewClass
 
