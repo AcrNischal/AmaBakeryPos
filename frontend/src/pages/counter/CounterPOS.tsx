@@ -292,10 +292,10 @@ export default function CounterPOS() {
             toast.error("Please select payment method");
             return;
         }
-        // if (paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < total)) {
-        //     toast.error("Insufficient cash received");
-        //     return;
-        // }
+        if (paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < total)) {
+            toast.error("Insufficient cash received");
+            return;
+        }
 
         setIsProcessing(true);
         const user = getCurrentUser();
