@@ -138,7 +138,7 @@ export default function SuperAdminAnalytics() {
                 <div className="flex items-center gap-3">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="h-11 rounded-xl border-2 font-bold px-4 hover:bg-slate-50 transition-all border-slate-100 shadow-sm gap-2 bg-white">
+                            <Button variant="outline" className="h-11 rounded-xl border-2 font-bold px-4 hover:bg-slate-50 transition-all border-slate-100 shadow-sm gap-2 bg-white hover:text-primary">
                                 <Filter className="h-4 w-4 text-primary" />
                                 <span className="capitalize">{timeframe}</span>
                                 <ChevronDown className="h-3 w-3 opacity-50" />

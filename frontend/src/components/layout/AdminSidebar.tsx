@@ -94,13 +94,13 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
 
       {/* Security Info */}
       <div className="p-4 border-t border-sidebar-border space-y-2">
-        {user?.role == "ADMIN"   && (
+        {user?.role == "ADMIN" && (
           <button
             onClick={() => {
               localStorage.removeItem('selectedBranch');
               window.location.href = "/super-admin/dashboard";
             }}
-            className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-amber-500 hover:bg-amber-50 transition-all mb-2 border border-amber-200"
+            className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white hover:bg-primary transition-all mb-2 border border-white/40 hover:border-primary"
           >
             <Shield className="h-5 w-5" />
             Back to HQ Dashboard

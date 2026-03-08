@@ -98,8 +98,27 @@ export default function OrderStatus() {
     (o) => o?.invoice_status === "COMPLETED" || o?.invoice_status === "CANCELLED"
   );
 
+  // Deduplicate notifications per order ID (keep most recent) and filter by current order status
+  const filteredDeduplicatedNotifications = notifications.reduce((acc: any[], current: any) => {
+    const order = allOrders.find(o => String(o.id) === String(current.invoice));
+
+    // Only keep if the order exists and is currently READY
+    if (!order || order.invoice_status !== "READY") return acc;
+
+    const existingIdx = acc.findIndex(n => String(n.invoice) === String(current.invoice));
+    if (existingIdx > -1) {
+      // Keep the one with higher ID (more recent)
+      if (current.id > acc[existingIdx].id) {
+        acc[existingIdx] = current;
+      }
+    } else {
+      acc.push(current);
+    }
+    return acc;
+  }, []);
+
   // Group notifications by floor for better organization
-  const notificationsByFloor = notifications.reduce((acc: any, notif: any) => {
+  const notificationsByFloor = filteredDeduplicatedNotifications.reduce((acc: any, notif: any) => {
     const order = allOrders.find(o => String(o.id) === String(notif.invoice));
     const floorName = notif.floor_name || order?.floor_name || "Unassigned";
     if (!acc[floorName]) {
@@ -206,7 +225,7 @@ export default function OrderStatus() {
             {statusTab === "ready" && (
               <>
                 {/* Ready Orders via Notifications */}
-                {(notifications.length > 0 || readyOrders.filter(o => !notifications.some(n => String(n.invoice) === String(o.id))).length > 0) && (
+                {(filteredDeduplicatedNotifications.length > 0 || readyOrders.filter(o => !filteredDeduplicatedNotifications.some(n => String(n.invoice) === String(o.id))).length > 0) && (
                   <div className="space-y-4">
                     {/* Group notifications by floor */}
                     {Object.entries(notificationsByFloor).map(([floorName, floorNotifications]: [string, any[]]) => (
@@ -231,7 +250,9 @@ export default function OrderStatus() {
                                 products={products}
                                 categories={categories}
                                 onDismiss={async () => {
-                                  await markNotificationRead(notif.id);
+                                  // Mark ALL notifications for this order as read
+                                  const orderNotifs = notifications.filter(n => String(n.invoice) === String(order.id));
+                                  await Promise.all(orderNotifs.map(n => markNotificationRead(n.id)));
                                   loadData();
                                 }}
                               />
@@ -245,26 +266,26 @@ export default function OrderStatus() {
                     {readyOrders
                       .filter(o => !notifications.some(n => String(n.invoice) === String(o.id)))
                       .length > 0 && (
-                      <section>
-                        <h2 className="text-xs font-bold mb-2 text-success/70 uppercase tracking-widest flex items-center gap-1.5">
-                          <span className="h-4 w-4 rounded-full bg-success/70 inline-flex items-center justify-center text-white text-[9px] font-black">
-                            {readyOrders.filter(o => !notifications.some(n => String(n.invoice) === String(o.id))).length}
-                          </span>
-                          Other Ready Orders
-                        </h2>
-                        <div className="space-y-3">
-                          {readyOrders
-                            .filter(o => !notifications.some(n => String(n.invoice) === String(o.id)))
-                            .map((order) => (
-                              <OrderCard key={`order-${order.id}`} order={order} showWaiter={activeTab === "all"} activeTab={activeTab} products={products} categories={categories} />
-                            ))}
-                        </div>
-                      </section>
-                    )}
+                        <section>
+                          <h2 className="text-xs font-bold mb-2 text-success/70 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className="h-4 w-4 rounded-full bg-success/70 inline-flex items-center justify-center text-white text-[9px] font-black">
+                              {readyOrders.filter(o => !filteredDeduplicatedNotifications.some(n => String(n.invoice) === String(o.id))).length}
+                            </span>
+                            Other Ready Orders
+                          </h2>
+                          <div className="space-y-3">
+                            {readyOrders
+                              .filter(o => !filteredDeduplicatedNotifications.some(n => String(n.invoice) === String(o.id)))
+                              .map((order) => (
+                                <OrderCard key={`order-${order.id}`} order={order} showWaiter={activeTab === "all"} activeTab={activeTab} products={products} categories={categories} />
+                              ))}
+                          </div>
+                        </section>
+                      )}
                   </div>
                 )}
 
-                {notifications.length === 0 && readyOrders.filter(o => !notifications.some(n => String(n.invoice) === String(o.id))).length === 0 && (
+                {filteredDeduplicatedNotifications.length === 0 && readyOrders.filter(o => !filteredDeduplicatedNotifications.some(n => String(n.invoice) === String(o.id))).length === 0 && (
                   <div className="py-8 text-center text-muted-foreground text-sm">No orders ready for pickup</div>
                 )}
               </>
@@ -382,9 +403,7 @@ function OrderCard({
           <span className="font-bold text-[15px]">
             Order #{order?.invoice_number ? String(order.invoice_number).slice(-4) : "????"}
           </span>
-          <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider text-slate-500">
-            {order?.invoice_type || "Dine-in"}
-          </span>
+
           {/* Floor badge - always show if floor name exists */}
           {floorName && (
             <span className="text-[10px] bg-success/20 text-success px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
@@ -404,7 +423,7 @@ function OrderCard({
               {parsedTableNo ? (
                 <>
                   Table <span className="font-bold text-slate-800">{parsedTableNo}</span>
-                  {floorName && <span className="text-success font-semibold"> • Floor: {floorName}</span>}
+
                 </>
               ) : (
                 <span className="font-bold text-slate-800">Takeaway</span>
@@ -486,11 +505,8 @@ function OrderCard({
                 <span>{notification.kitchen_user_name}</span>
                 {(notification.floor_name || order?.floor_name) && (
                   <>
-                    <span className="text-success/50">•</span>
-                    <span className="bg-success/10 px-1.5 py-0.5 rounded-full">
-                      FLOOR: {(notification.floor_name || order?.floor_name).toUpperCase()}
-                    </span>
-                </>
+
+                  </>
                 )}
               </span>
             ) : (
@@ -498,10 +514,7 @@ function OrderCard({
                 <span>Active Order</span>
                 {order?.floor_name && (
                   <>
-                    <span className="text-slate-300">•</span>
-                    <span className="bg-slate-100 px-1.5 py-0.5 rounded-full">
-                      FLOOR: {order.floor_name.toUpperCase()}
-                    </span>
+
                   </>
                 )}
               </span>
