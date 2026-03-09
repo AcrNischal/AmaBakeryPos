@@ -377,7 +377,7 @@ export default function KitchenDisplay() {
                             <div className="flex justify-between items-start mb-3">
                               <div>
                                 <h3 className="font-bold text-slate-800">Order #{order.id.slice(-3)}</h3>
-                                <p className="text-sm text-slate-500">Table {order.tableNumber} • {order.waiter}</p>
+                                <p className="text-sm text-slate-500">Table {order.tableNumber}</p>
                                 <div className="flex items-center gap-4">
                                   {order.floorName && <span className="text-[10px] font-black text-primary uppercase">{order.floorName}</span>}
                                   {order.createdAt && (

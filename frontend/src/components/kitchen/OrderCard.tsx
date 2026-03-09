@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Clock } from "lucide-react";
+import { RotateCcw, Clock, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useEffect } from "react";
@@ -60,28 +60,15 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
       )} />
 
       {/* Card Header (Minimized Metadata) */}
-      <div className="px-4 py-2 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-black text-slate-400">#{order.id.slice(-3)}</span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-tight">
-              <span>ACTIVE</span>
-              {timeAgo && (
-                <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1 animate-pulse">
-                  <Clock className="h-2.5 w-2.5" />
-                  <span>{timeAgo}</span>
-                </div>
-              )}
+      <div className="px-4 py-2 border-b border-slate-50 flex justify-between items-center bg-slate-50/30 gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+          <span className="text-[10px] sm:text-xs font-black text-slate-400 shrink-0">#{order.id.slice(-3)}</span>
+          {timeAgo && (
+            <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded animate-pulse shrink-0">
+              <Clock className="h-2.5 w-2.5" />
+              <span className="text-[10px] font-black uppercase tracking-tight">{timeAgo}</span>
             </div>
-            {order.waiter && (
-              <div className="flex items-center gap-3">
-                <div className="h-3 w-px bg-slate-200" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[100px]">
-                  {order.waiter}
-                </span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -97,9 +84,9 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 shadow-sm">TAKEAWAY</span>
             )}
             {order.tableNumber && order.floorName && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">FLOOR</span>
-                <span className="text-xs font-black text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 min-w-[30px] text-center shadow-sm">
+              <div className="flex items-center gap-1.5 bg-primary/5 px-2 py-1 rounded-lg border border-primary/10 shadow-sm">
+                <Layers className="h-3 w-3 text-primary opacity-70" />
+                <span className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-tight">
                   {order.floorName}
                 </span>
               </div>

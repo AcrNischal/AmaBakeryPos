@@ -690,18 +690,17 @@ export default function AdminMenu() {
                                     className={`card-elevated p-4 transition-all hover:shadow-lg cursor-pointer active:scale-[0.98] group ${!item.is_available && 'opacity-60 grayscale-[0.5]'}`}
                                 >
                                     <div className="flex items-start justify-between mb-3">
-                                        <div>
+                                        <div className="flex-1 mr-4">
                                             <h3 className="font-bold text-slate-900 text-lg leading-snug group-hover:text-primary transition-colors">{item.name}</h3>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <p className="text-[11px] uppercase font-black tracking-widest text-slate-400 underline decoration-slate-200 decoration-2 underline-offset-2">{item.category_name}</p>
-                                                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                <p className="text-[10px] uppercase font-black tracking-widest text-primary/60 flex items-center gap-1">
-                                                    <CookingPot className="h-3 w-3" />
-                                                    {categories.find(c => c.id === item.category)?.kitchentype_name || 'No Kitchen'}
-                                                </p>
-                                            </div>
+                                            <p className="text-[11px] uppercase font-black tracking-widest text-slate-400 underline decoration-slate-200 decoration-2 underline-offset-2 mt-1">{item.category_name}</p>
                                         </div>
-                                        <span className="text-xl font-black text-primary">Rs.{item.selling_price}</span>
+                                        <div className="text-right flex flex-col items-end gap-1.5">
+                                            <span className="text-xl font-black text-primary">Rs.{item.selling_price}</span>
+                                            <p className="text-[10px] uppercase font-black tracking-widest text-primary/60 flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
+                                                <CookingPot className="h-3 w-3" />
+                                                {categories.find(c => c.id === item.category)?.kitchentype_name || 'No Kitchen'}
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-2" onClick={(e) => e.stopPropagation()}>

@@ -128,6 +128,10 @@ export default function AdminUsers() {
   );
 
   const handleDelete = async (userId: string) => {
+    if (userId === currentUser?.id) {
+      toast.error("You cannot delete yourself");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
       await deleteUser(userId);
@@ -457,17 +461,19 @@ export default function AdminUsers() {
                             Reset Password
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-50 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(user.id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {user.id !== currentUser?.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-red-50 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(user.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
