@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "📦 Creating development utilities..."
-echo "====================================="
+echo "📦 AmaBakery POS - Installation & Setup"
+echo "========================================="
 
-# Create start.sh
+# 1. Create start.sh
 cat >start.sh <<'EOF'
 #!/bin/bash
 
@@ -18,7 +18,7 @@ djstart() {
     [ -d "env" ] || { echo "❌ env not found"; return 1; }
     . env/bin/activate
     cd mysite || return
-    python manage.py runserver
+    python manage.py runserver 0.0.0.0:8000
 }
 
 nodestart() {
@@ -28,19 +28,24 @@ nodestart() {
     fi
 
     cd frontend || return
-    NODE_OPTIONS="--max-old-space-size=1024" npm run dev
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    npm run dev -- --host 0.0.0.0 --port 8080
 }
 
 sdn() {
-    echo "Starting Django and Node servers..."
-    djstart &
+    echo "🚀 Starting Django and Node servers..."
+    djstart > /tmp/django_start.log 2>&1 &
     DJ_PID=$!
-    nodestart &
+    nodestart > /tmp/node_start.log 2>&1 &
     NODE_PID=$!
     
-    echo "✅ Servers started!"
-    echo "Django PID: $DJ_PID"
-    echo "Node PID: $NODE_PID"
+    echo "✅ Servers started in background!"
+    echo "   Django PID: $DJ_PID"
+    echo "   Node PID: $NODE_PID"
+    echo ""
+    echo "🌐 URLs:"
+    echo "   Frontend: http://localhost:8080"
+    echo "   Backend:  http://127.0.0.1:8000"
     echo ""
     echo "Press Ctrl+C to stop all servers"
     
@@ -80,7 +85,7 @@ kill_all() {
 }
 
 killallport() {
-    ports=(3000 8080 8000 8080 5000)
+    ports=(3000 8080 8000 5000)
     for p in "${ports[@]}"; do
         if lsof -ti tcp:$p >/dev/null 2>&1; then
             local PID
@@ -114,8 +119,8 @@ EOF
 chmod +x start.sh
 echo "✅ Created start.sh"
 
-# Create reset.sh
-cat >reset.sh <<'EOF'
+# 2. Create reset.sh
+cat >reset.sh <<'RESET_EOF'
 #!/bin/bash
 
 # -------- Kill Functions --------
@@ -143,19 +148,7 @@ kill_node() {
     fi
 }
 
-killallport() {
-    ports=(3000 8080 8000 8080 5000)
-    for p in "${ports[@]}"; do
-        if lsof -ti tcp:$p >/dev/null 2>&1; then
-            local PID
-            PID="$(lsof -ti tcp:$p)"
-            kill -9 $PID 2>/dev/null || true
-            echo "✅ Killed port $p (PID: $PID)"
-        fi
-    done
-}
-
-# -------- Comprehensive Start Functions --------
+# -------- Comprehensive Reset & Start Functions --------
 start_django() {
     local BACKEND_DIR=""
     local MYSITE_DIR=""
@@ -174,252 +167,170 @@ start_django() {
 
     if [ -z "$MYSITE_DIR" ]; then
         echo "❌ Django project not found!"
-        echo "   Expected: Backend/mysite or backend/mysite"
         return 1
     fi
 
-    echo "🚀 Starting Django backend..."
-    
-    # Kill existing Django
+    echo "🚀 Resetting & Starting Django backend..."
     kill_django
     
     pushd "$BACKEND_DIR" >/dev/null
-
-    # Handle virtual environment
-    if [ -d "env" ]; then
-        echo "🗑️ Removing existing env..."
-        rm -rf env
-    fi
     
-    echo "🐍 Creating python venv (env)..."
+    # 1. Reset Environment
+    [ -d "env" ] && rm -rf env
     python3 -m venv env
     source env/bin/activate
     
-    # Install requirements
+    # 2. Install Dependencies
     if [ -f "requirements.txt" ]; then
-        echo "📦 Installing requirements..."
         pip install -r requirements.txt
     else
-        echo "📦 Installing Django..."
         pip install django djangorestframework django-cors-headers
     fi
 
     cd "$(basename "$MYSITE_DIR")"
 
-    # Fix DEFAULT_AUTO_FIELD if settings.py exists
-    if [ -f "settings.py" ] && ! grep -q "DEFAULT_AUTO_FIELD" settings.py; then
-        echo "🔧 Fixing Django auto field..."
-        echo "" >> settings.py
-        echo "DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'" >> settings.py
-    fi
-
-    # Run migrations
-    echo "🔄 Running migrations..."
+    # 3. Reset Database
+    [ -f "db.sqlite3" ] && rm db.sqlite3
     python3 manage.py makemigrations 2>/dev/null || true
     python3 manage.py migrate 2>&1 | grep -v "WARNINGS" || true
     
-    # Create superuser
-    echo "👤 Creating superuser..."
-    python3 manage.py shell -c "
+    # 4. Seed Dummy Data
+    echo "🌱 Seeding realistic data (Branches, Managers, Staff, Products, Floors)..."
+    python3 manage.py shell <<EOF
+import random
 from django.contrib.auth import get_user_model
+from api.models import Branch, Kitchentype, ProductCategory, Product, Floor
+
 User = get_user_model()
+
 try:
-    User.objects.create_superuser('su', 'su@gmail.com', 'su')
-    print('✅ Superuser created')
-except:
-    try:
-        user = User.objects.get(username='su')
-        user.set_password('su')
-        user.save()
-        print('✅ Superuser updated')
-    except:
-        print('⚠️ Could not create/update superuser')
-" 2>/dev/null || true
+    # --- Superuser ---
+    User.objects.create_superuser('su', 'su@gmail.com', 'su', user_type='ADMIN')
+    print('✅ Admin: su / su')
 
-    # Start Django server
-    echo "🌐 Starting Django server..."
-    nohup python3 manage.py runserver 0.0.0.0:8000 > /tmp/django.log 2>&1 &
-    local DJANGO_PID=$!
+    # --- Branches ---
+    branches_data = [
+        ('Ama Main Bakery', 'Downtown Plaza'),
+        ('Ama Cake Shop', 'Riverside Mall'),
+        ('Ama Heritage Cafe', 'Central Square'),
+        ('Ama Pastry House', 'East End'),
+        ('Ama Express', 'Terminal 1')
+    ]
+
+    kitchen_names = ['Main Oven', 'Cold Store', 'Drink Bar', 'Decoration Room', 'Prep Station']
     
-    sleep 2
-    if ps -p $DJANGO_PID > /dev/null 2>&1; then
-        echo "✅ Django running: http://127.0.0.1:8000"
-        echo "   Admin: http://127.0.0.1:8000/admin"
-        echo "   User: su / Pass: su"
-        echo "   Logs: /tmp/django.log"
-    else
-        echo "❌ Django failed to start"
-        tail -10 /tmp/django.log
-    fi
+    category_data = [
+        ('Handcrafted Bread', ['Sourdough', 'French Baguette', 'Whole Wheat', 'Garlic Loaf', 'Focaccia']),
+        ('Signature Cakes', ['Black Forest', 'Red Velvet', 'Vanilla Bean', 'Tiramisu', 'Fruit Fiesta']),
+        ('Fresh Pastries', ['Croissant', 'Pain au Chocolat', 'Apple Turnover', 'Fruit Tart', 'Cheese Puff']),
+        ('Cookies', ['Choco Chip', 'Oatmeal Raisin', 'Peanut Butter', 'Macarons', 'Biscotti']),
+        ('Beverages', ['Americano', 'Cappuccino', 'Latte', 'Hot Chocolate', 'Green Tea'])
+    ]
 
+    for b_name, b_loc in branches_data:
+        branch, _ = Branch.objects.get_or_create(name=b_name, defaults={'location': b_loc})
+        
+        # Floors & Tables
+        for f_num in [1, 2]:
+            Floor.objects.get_or_create(name=f"Floor {f_num} - {b_name}", branch=branch, defaults={'table_count': 10})
+
+        # Kitchens
+        kitchen_types = []
+        for kname in kitchen_names:
+            kt, _ = Kitchentype.objects.get_or_create(name=f"{kname} ({b_name})", branch=branch)
+            kitchen_types.append(kt)
+        
+        # Products
+        for i, (cat_name, prod_list) in enumerate(category_data):
+            cat, _ = ProductCategory.objects.get_or_create(name=cat_name, branch=branch, kitchentype=kitchen_types[i % len(kitchen_types)])
+            for p_name in prod_list:
+                Product.objects.create(name=p_name, branch=branch, category=cat, cost_price=50, selling_price=150, product_quantity=100)
+
+        # Staff (Global naming: manager1, waiter1...)
+        b_idx = branches_data.index((b_name, b_loc))
+        for set_num in [1, 2]:
+            idx = (b_idx * 2) + set_num
+            roles = [('manager', 'BRANCH_MANAGER'), ('waiter', 'WAITER'), ('counter', 'COUNTER'), ('kitchen', 'KITCHEN')]
+            for prefix, r_type in roles:
+                user = User.objects.create(username=f"{prefix}{idx}", user_type=r_type, branch=branch, full_name=f"{prefix.capitalize()} {idx}")
+                user.set_password('pass123')
+                if r_type == 'KITCHEN': user.kitchentype = kitchen_types[0]
+                user.save()
+    print('✅ Realistic dummy data seeded')
+except Exception as e:
+    print(f'⚠️ Seeding Error: {e}')
+EOF
+
+    # 5. Start Server
+    nohup python3 manage.py runserver 0.0.0.0:8000 > /tmp/django.log 2>&1 &
+    echo "✅ Django running on http://127.0.0.1:8000"
     popd >/dev/null
-    return 0
 }
 
 start_node() {
     local FRONTEND_DIR=""
+    [ -d "Frontend" ] && FRONTEND_DIR="Frontend" || [ -d "frontend" ] && FRONTEND_DIR="frontend"
     
-    # Detect Node project
-    if [ -d "Frontend" ] && [ -f "Frontend/package.json" ]; then
-        FRONTEND_DIR="Frontend"
-    elif [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        FRONTEND_DIR="frontend"
-    fi
-
     if [ -z "$FRONTEND_DIR" ]; then
         echo "❌ Node project not found!"
-        echo "   Expected: Frontend/ or frontend/ with package.json"
         return 1
     fi
 
-    echo "🚀 Starting Node frontend..."
-    
-    # Kill existing Node
+    echo "🚀 Resetting & Starting Node frontend..."
     kill_node
     
     pushd "$FRONTEND_DIR" >/dev/null
-
-    # Increase Node memory limit
+    
+    # Optional Deep Reset (Uncomment if needed)
+    # [ -d "node_modules" ] && rm -rf node_modules
+    
+    [ ! -d "node_modules" ] && { echo "📦 Installing deps..."; npm install; }
+    
     export NODE_OPTIONS="--max-old-space-size=4096"
-    
-    # Install if needed
-    if [ ! -d "node_modules" ]; then
-        echo "📦 Installing dependencies..."
-        npm install
-    fi
-
-    # Start frontend
-    echo "⚡ Starting Vite..."
     nohup npm run dev -- --host 0.0.0.0 --port 8080 > /tmp/node.log 2>&1 &
-    local NODE_PID=$!
     
-    sleep 3
-    if ps -p $NODE_PID > /dev/null 2>&1; then
-        echo "✅ Frontend running: http://localhost:8080"
-        echo "   Logs: /tmp/node.log"
-        
-        # Show Vite URLs after a moment
-        sleep 1
-        echo "🌍 Vite URLs:"
-        tail -5 /tmp/node.log | grep -E "➜|Local:|Network:" | head -2 || true
-    else
-        echo "❌ Frontend failed to start"
-        tail -10 /tmp/node.log
-    fi
-
+    echo "✅ Frontend running on http://localhost:8080"
     popd >/dev/null
-    return 0
 }
 
-# -------- Main Reset Function --------
-reset_pydjno() {
-    local BACKEND_DIR=""
-    local MYSITE_DIR=""
-    local FRONTEND_DIR=""
-    
-    # Detect projects
-    if [ -d "Backend/backend/mysite" ]; then
-        BACKEND_DIR="Backend/backend"
-        MYSITE_DIR="Backend/backend/mysite"
-    elif [ -d "Backend/mysite" ]; then
-        BACKEND_DIR="Backend"
-        MYSITE_DIR="Backend/mysite"
-    elif [ -d "backend/mysite" ]; then
-        BACKEND_DIR="backend"
-        MYSITE_DIR="backend/mysite"
-    fi
+# -------- Interactive Choice Logic --------
+if [ "$1" = "--auto" ]; then
+    CH=3
+else
+    echo ""
+    echo "🔄 AmaBakery POS Reset Utility"
+    echo "------------------------------"
+    echo "1) Reset Backend (Wipe DB, Reseed Data)"
+    echo "2) Reset Frontend (Clean Restart)"
+    echo "3) Reset Both (Full System Refresh)"
+    echo ""
+    read -r -p "Enter choice [1-3]: " CH
+fi
 
-    if [ -d "Frontend" ] && [ -f "Frontend/package.json" ]; then
-        FRONTEND_DIR="Frontend"
-    elif [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        FRONTEND_DIR="frontend"
-    fi
+case "$CH" in
+    1) start_django ;;
+    2) start_node ;;
+    3) start_django; sleep 1; start_node ;;
+    *) echo "❌ Invalid choice!" ;;
+esac
 
-    if [ -z "$MYSITE_DIR" ] && [ -z "$FRONTEND_DIR" ]; then
-        echo "❌ No projects found!"
-        echo "   Expected Django: Backend/mysite"
-        echo "   Expected Node: frontend/ with package.json"
-        return 1
-    fi
-
-    echo
-    echo "📁 Project detected:"
-    [ -n "$MYSITE_DIR" ] && echo "   🐍 Django: $MYSITE_DIR"
-    [ -n "$FRONTEND_DIR" ] && echo "   ⚡ Node: $FRONTEND_DIR"
-    echo
-
-    echo "Choose what to reset:"
-    echo "1) Backend (Django)"
-    echo "2) Frontend (Node)"
-    echo "3) Both (Django + Node)"
-    echo
-    
-    read -r -p "Enter choice (1/2/3): " CH
-    
-    echo
-    echo "════════════════════════════════════════════════════════════"
-
-    case "$CH" in
-        1)
-            start_django
-            ;;
-        2)
-            start_node
-            ;;
-        3)
-            start_django
-            if [ $? -eq 0 ]; then
-                echo
-                echo "⏳ Waiting for Django..."
-                sleep 2
-            fi
-            start_node
-            ;;
-        *)
-            echo "❌ Invalid choice!"
-            return 1
-            ;;
-    esac
-
-    echo
-    echo "════════════════════════════════════════════════════════════"
-    echo "✅ Reset complete! Servers are running in background."
-    echo
-    echo "🛑 To stop servers:"
-    echo "   ./start.sh kill      # Stop both"
-    echo "   ./start.sh kill django  # Stop Django only"
-    echo "   ./start.sh kill node    # Stop Node only"
-    echo "   ./start.sh kill ports   # Kill all dev ports"
-    echo
-    echo "🌐 URLs:"
-    [ -n "$MYSITE_DIR" ] && echo "   Django: http://127.0.0.1:8000"
-    [ -n "$MYSITE_DIR" ] && echo "   Admin:  http://127.0.0.1:8000/admin (su/su)"
-    [ -n "$FRONTEND_DIR" ] && echo "   Frontend: http://localhost:8080"
-    echo
-}
-
-# Run the reset function
-reset_pydjno
-EOF
+echo ""
+echo "✅ Operational Status:"
+echo "   Frontend: http://localhost:8080"
+echo "   Backend:  http://127.0.0.1:8000"
+echo "   Admin:    http://127.0.0.1:8000/admin (su/su)"
+RESET_EOF
 
 chmod +x reset.sh
 echo "✅ Created reset.sh"
 
 echo ""
+echo "🚀 Finishing installation (Auto-setup)..."
+./reset.sh --auto
+
+echo ""
 echo "🎉 Installation Complete!"
 echo "========================"
-echo ""
-echo "📋 Created files:"
-echo "  • start.sh  - Start servers (with kill options)"
-echo "  • reset.sh  - Reset environment and start servers"
-echo ""
-echo "🚀 Quick Start:"
-echo "  ./reset.sh                   # Full reset & start"
-echo "  ./start.sh                   # Start both servers"
-echo "  ./start.sh django            # Start Django only"
-echo "  ./start.sh node              # Start Node only"
-echo "  ./start.sh kill              # Stop both servers"
-echo "  ./start.sh kill django       # Stop Django only"
-echo "  ./start.sh kill node         # Stop Node only"
-echo "  ./start.sh kill ports        # Kill all dev ports"
+echo "Use ./start.sh to run without resetting."
+echo "Use ./reset.sh to wipe and start fresh."
 echo ""
