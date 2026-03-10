@@ -280,7 +280,16 @@ def report_dashboard(my_branch=None, request=None):
     if my_branch:
         period_filter_p["invoice__branch"] = my_branch
 
-    sales_by_category = get_distribution(InvoiceItem, period_filter_ii, "product__category__name", "category_total_sales")
+    sales_by_category_raw = get_distribution(InvoiceItem, period_filter_ii, "product__category__name", "category_total_sales")
+    
+    # Calculate percentages for category distribution
+    sales_by_category = []
+    total_sales_float = float(current_sales)
+    for cat in sales_by_category_raw:
+        cat_amount = float(cat.get("category_total_sales", 0))
+        percent = (cat_amount / total_sales_float * 100) if total_sales_float > 0 else 0
+        cat["category_percent"] = percent
+        sales_by_category.append(cat)
     sales_by_kitchen = get_distribution(InvoiceItem, period_filter_ii, "product__category__kitchentype__name")
     sales_by_payment = get_distribution(Payment, period_filter_p, "payment_method")
     sales_by_status = list(Invoice.objects.filter(**base_filter).values("payment_status").annotate(total_amount=Coalesce(Sum("total_amount"), Value(0.0, output_field=DecimalField()))).order_by("-total_amount"))
