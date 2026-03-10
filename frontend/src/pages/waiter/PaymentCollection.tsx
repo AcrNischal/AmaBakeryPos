@@ -154,10 +154,10 @@ export default function PaymentCollection() {
       return;
     }
 
-    // if (received < due) {
-    //   toast.error("Insufficient amount");
-    //   return;
-    // }
+    if (received < due) {
+      toast.error("Insufficient amount");
+      return;
+    }
 
 
 
