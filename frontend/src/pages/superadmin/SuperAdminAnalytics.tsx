@@ -185,10 +185,7 @@ export default function SuperAdminAnalytics() {
                         </Popover>
                     )}
 
-                    <Button className="rounded-xl bg-slate-900 group h-11 px-6">
-                        <Download className="h-4 w-4 mr-2 group-hover:translate-y-0.5 transition-transform" />
-                        Export
-                    </Button>
+
                 </div>
             </div>
 
@@ -332,7 +329,10 @@ export default function SuperAdminAnalytics() {
                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                                         <span className="text-[11px] font-black text-slate-500 uppercase tracking-tight truncate max-w-[120px]">{cat.product__category__name}</span>
                                     </div>
-                                    <span className="text-xs font-black text-slate-900">{parseFloat(cat.category_percent || 0).toFixed(1)}%</span>
+                                    <span className="text-xs font-black text-slate-900">
+                                        {cat.category_percent ? parseFloat(cat.category_percent).toFixed(1) :
+                                            ((parseFloat(cat.category_total_sales || 0) / (data?.total_sum || 1)) * 100).toFixed(1)}%
+                                    </span>
                                 </div>
                             ))}
                         </div>
