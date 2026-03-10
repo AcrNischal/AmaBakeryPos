@@ -199,12 +199,13 @@ start_django() {
     python3 manage.py shell <<EOF
 import random
 from django.contrib.auth import get_user_model
-from api.models import Branch, Kitchentype, ProductCategory, Product, Floor
+from api.models import Branch, Kitchentype, ProductCategory, Product, Floor, Customer, Invoice, InvoiceItem, Payment
 
 User = get_user_model()
 
 try:
     # --- Superuser ---
+    User.objects.all().delete()
     User.objects.create_superuser('su', 'su@gmail.com', 'su', user_type='ADMIN')
     print('✅ Admin: su / su')
 
@@ -244,7 +245,12 @@ try:
         for i, (cat_name, prod_list) in enumerate(category_data):
             cat, _ = ProductCategory.objects.get_or_create(name=cat_name, branch=branch, kitchentype=kitchen_types[i % len(kitchen_types)])
             for p_name in prod_list:
-                Product.objects.create(name=p_name, branch=branch, category=cat, cost_price=50, selling_price=150, product_quantity=100)
+                Product.objects.get_or_create(name=p_name, branch=branch, defaults={
+                    'category': cat, 
+                    'cost_price': 50, 
+                    'selling_price': 150, 
+                    'product_quantity': 100
+                })
 
         # Staff (Global naming: manager1, waiter1...)
         b_idx = branches_data.index((b_name, b_loc))
@@ -252,10 +258,80 @@ try:
             idx = (b_idx * 2) + set_num
             roles = [('manager', 'BRANCH_MANAGER'), ('waiter', 'WAITER'), ('counter', 'COUNTER'), ('kitchen', 'KITCHEN')]
             for prefix, r_type in roles:
-                user = User.objects.create(username=f"{prefix}{idx}", user_type=r_type, branch=branch, full_name=f"{prefix.capitalize()} {idx}")
-                user.set_password('pass123')
+                username = f"{prefix}{idx}"
+                user, created = User.objects.get_or_create(username=username, defaults={
+                    'user_type': r_type, 
+                    'branch': branch, 
+                    'email': f"{username}@example.com",
+                    'full_name': f"{prefix.capitalize()} {idx}"
+                })
+                if created:
+                    user.set_password('pass123')
                 if r_type == 'KITCHEN': user.kitchentype = kitchen_types[0]
                 user.save()
+
+    # --- Customers ---
+    customer_names = ['John Doe', 'Jane Smith', 'Alice Cooper', 'Bob Marley', 'Charlie Brown']
+    for b_name, b_loc in branches_data:
+        branch = Branch.objects.get(name=b_name)
+        for cname in customer_names:
+            Customer.objects.get_or_create(name=cname, branch=branch, defaults={'phone': f'98{random.randint(10000000, 99999999)}'})
+
+    # --- Invoices ---
+    print('🌱 Seeding 10 invoices per branch...')
+    for b_name, b_loc in branches_data:
+        branch = Branch.objects.get(name=b_name)
+        products = list(Product.objects.filter(branch=branch))
+        waiters = list(User.objects.filter(branch=branch, user_type='WAITER'))
+        customers = list(Customer.objects.filter(branch=branch))
+        
+        if not products or not waiters or not customers:
+            continue
+
+        for i in range(10):
+            # Pick a product - cycling through ensure different category/kitchen type
+            cat_idx = (i % 5)
+            prod_in_cat_idx = (i // 5)
+            prod_idx = (cat_idx * 5) + prod_in_cat_idx
+            
+            prod = products[prod_idx % len(products)]
+            waiter = random.choice(waiters)
+            customer = random.choice(customers)
+            
+            invoice_num = f"INV-{branch.id}-{i+1:04d}-{random.randint(100,999)}"
+            qty = random.randint(1, 5)
+            subtotal = prod.selling_price * qty
+            total = subtotal
+            
+            p_status = "PAID" if i % 2 == 0 else "PENDING"
+            i_status = "COMPLETED" if i % 2 == 0 else "READY"
+            
+            inv = Invoice.objects.create(
+                branch=branch,
+                customer=customer,
+                invoice_number=invoice_num,
+                created_by=waiter,
+                subtotal=subtotal,
+                total_amount=total,
+                paid_amount=total if p_status == "PAID" else 0,
+                payment_status=p_status,
+                invoice_status=i_status
+            )
+            
+            InvoiceItem.objects.create(
+                invoice=inv,
+                product=prod,
+                quantity=qty,
+                unit_price=prod.selling_price
+            )
+            
+            if p_status == "PAID":
+                Payment.objects.create(
+                    invoice=inv,
+                    amount=total,
+                    payment_method=random.choice(["CASH", "QR", "CARD"]),
+                    received_by=waiter
+                )
     print('✅ Realistic dummy data seeded')
 except Exception as e:
     print(f'⚠️ Seeding Error: {e}')

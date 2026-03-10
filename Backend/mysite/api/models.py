@@ -1,3 +1,4 @@
+from enum import unique
 import uuid
 from decimal import Decimal
 
@@ -38,6 +39,7 @@ class ProductCategory(models.Model):
 
 class User(AbstractUser):
     phone = models.CharField(max_length=15, blank=True)
+    email = models.EmailField(max_length=250,unique=True)
     branch = models.ForeignKey(
         Branch,
         on_delete=models.CASCADE,
