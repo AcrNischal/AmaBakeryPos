@@ -1,32 +1,37 @@
 deployment:
   tasks:
-    # Your actual cPanel deployment path
+    # Set deployment path
     - export DEPLOYPATH=/home/amabaker/public_html/
     
-    # --- Create main application directory ---
+    # Create main application directory
     - mkdir -p $DEPLOYPATH/Backend
     
-    # --- Copy the entire Backend folder ---
-    - /bin/cp -R Backend $DEPLOYPATH/
+    # Copy all files (excluding .git and unnecessary files)
+    - /bin/cp -r Backend/mysite $DEPLOYPATH/Backend/
+    - /bin/cp Backend/requirements.txt $DEPLOYPATH/Backend/
+    - /bin/cp Backend/runtime.txt $DEPLOYPATH/Backend/
     
-    # --- Set proper permissions ---
+    # Set correct permissions
     - find $DEPLOYPATH/Backend -type d -exec chmod 755 {} \;
     - find $DEPLOYPATH/Backend -type f -exec chmod 644 {} \;
     
-    # --- Navigate to your Django project ---
+    # Navigate to Django project
     - cd $DEPLOYPATH/Backend/mysite
     
-    # --- Create and setup virtual environment ---
+    # Create virtual environment if it doesn't exist
     - test -d venv || python3 -m venv venv
+    
+    # Install/update requirements
     - source venv/bin/activate && pip install -r $DEPLOYPATH/Backend/requirements.txt
     
-    # --- Django specific setup ---
     # Collect static files
     - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py collectstatic --noinput
     
-    # Run migrations (uncomment after verifying)
-    # - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py migrate
+    # Run database migrations (uncomment after first successful deployment)
+    # - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py migrate --noinput
     
-    # --- Restart your application ---
-    # For Passenger (common in cPanel)
+    # Restart the application (touch wsgi.py to reload)
     - touch $DEPLOYPATH/Backend/mysite/mysite/wsgi.py
+    
+    # Create a deployment marker (for verification)
+    - echo "Deployed on $(date)" > $DEPLOYPATH/Backend/deploy.log
