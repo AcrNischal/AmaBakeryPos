@@ -1,37 +1,134 @@
 deployment:
   tasks:
-    # Set deployment path
+    # === SETUP LOGGING ===
+    - export LOG_FILE=/home/amabaker/public_html/deployment_$(date +%Y%m%d_%H%M%S).log
+    - echo "=========================================" > $LOG_FILE
+    - echo "DEPLOYMENT STARTED: $(date)" >> $LOG_FILE
+    - echo "=========================================" >> $LOG_FILE
+    
+    # === CHECK ENVIRONMENT ===
+    - echo "=== ENVIRONMENT INFO ===" >> $LOG_FILE
+    - echo "User: $(whoami)" >> $LOG_FILE
+    - echo "Current directory: $(pwd)" >> $LOG_FILE
+    - echo "Home: $HOME" >> $LOG_FILE
+    - echo "PATH: $PATH" >> $LOG_FILE
+    
+    # === CHECK PYTHON ===
+    - echo "=== PYTHON INFO ===" >> $LOG_FILE
+    - which python3 >> $LOG_FILE 2>&1
+    - python3 --version >> $LOG_FILE 2>&1
+    - which pip3 >> $LOG_FILE 2>&1
+    - pip3 --version >> $LOG_FILE 2>&1
+    
+    # === CHECK REPOSITORY ===
+    - echo "=== REPOSITORY INFO ===" >> $LOG_FILE
+    - pwd >> $LOG_FILE
+    - ls -la /home/amabaker/repositories/AmaBakeryPos/ >> $LOG_FILE 2>&1
+    - git status >> $LOG_FILE 2>&1
+    - git log -1 >> $LOG_FILE 2>&1
+    
+    # === SET DEPLOYMENT PATH ===
+    - echo "=== DEPLOYMENT PATH ===" >> $LOG_FILE
     - export DEPLOYPATH=/home/amabaker/public_html/
+    - echo "DEPLOYPATH: $DEPLOYPATH" >> $LOG_FILE
     
-    # Create main application directory
+    # === CHECK PUBLIC_HTML ===
+    - echo "=== PUBLIC_HTML BEFORE ===" >> $LOG_FILE
+    - ls -la /home/amabaker/public_html/ >> $LOG_FILE 2>&1
+    
+    # === CREATE DIRECTORIES ===
+    - echo "=== CREATING DIRECTORIES ===" >> $LOG_FILE
     - mkdir -p $DEPLOYPATH/Backend
+    - mkdir -p $DEPLOYPATH/Backend/mysite
+    - echo "Created Backend directories" >> $LOG_FILE
     
-    # Copy all files (excluding .git and unnecessary files)
-    - /bin/cp -r Backend/mysite $DEPLOYPATH/Backend/
-    - /bin/cp Backend/requirements.txt $DEPLOYPATH/Backend/
-    - /bin/cp Backend/runtime.txt $DEPLOYPATH/Backend/
+    # === CHECK SOURCE FILES ===
+    - echo "=== CHECKING SOURCE FILES ===" >> $LOG_FILE
+    - ls -la /home/amabaker/repositories/AmaBakeryPos/Backend/ >> $LOG_FILE 2>&1
+    - ls -la /home/amabaker/repositories/AmaBakeryPos/Backend/mysite/ >> $LOG_FILE 2>&1
     
-    # Set correct permissions
-    - find $DEPLOYPATH/Backend -type d -exec chmod 755 {} \;
-    - find $DEPLOYPATH/Backend -type f -exec chmod 644 {} \;
+    # === COPY FILES ===
+    - echo "=== COPYING FILES ===" >> $LOG_FILE
     
-    # Navigate to Django project
+    # Copy mysite folder
+    - /bin/cp -rv /home/amabaker/repositories/AmaBakeryPos/Backend/mysite $DEPLOYPATH/Backend/ >> $LOG_FILE 2>&1
+    
+    # Copy requirements.txt
+    - /bin/cp -v /home/amabaker/repositories/AmaBakeryPos/Backend/requirements.txt $DEPLOYPATH/Backend/ >> $LOG_FILE 2>&1
+    
+    # Copy runtime.txt if exists
+    - if [ -f /home/amabaker/repositories/AmaBakeryPos/Backend/runtime.txt ]; then 
+        /bin/cp -v /home/amabaker/repositories/AmaBakeryPos/Backend/runtime.txt $DEPLOYPATH/Backend/ >> $LOG_FILE 2>&1; 
+      fi
+    
+    # === VERIFY COPY ===
+    - echo "=== VERIFYING COPY ===" >> $LOG_FILE
+    - ls -la $DEPLOYPATH/Backend/ >> $LOG_FILE 2>&1
+    - ls -la $DEPLOYPATH/Backend/mysite/ >> $LOG_FILE 2>&1
+    
+    # === SET PERMISSIONS ===
+    - echo "=== SETTING PERMISSIONS ===" >> $LOG_FILE
+    - find $DEPLOYPATH/Backend -type d -exec chmod 755 {} \; 2>> $LOG_FILE
+    - find $DEPLOYPATH/Backend -type f -exec chmod 644 {} \; 2>> $LOG_FILE
+    - echo "Permissions set" >> $LOG_FILE
+    
+    # === VIRTUAL ENVIRONMENT ===
+    - echo "=== VIRTUAL ENVIRONMENT ===" >> $LOG_FILE
     - cd $DEPLOYPATH/Backend/mysite
+    - echo "Current directory: $(pwd)" >> $LOG_FILE
     
-    # Create virtual environment if it doesn't exist
-    - test -d venv || python3 -m venv venv
+    # Check if venv exists
+    - if [ -d "venv" ]; then 
+        echo "venv already exists" >> $LOG_FILE; 
+      else 
+        echo "Creating new venv..." >> $LOG_FILE;
+        python3 -m venv venv >> $LOG_FILE 2>&1;
+        echo "venv creation exit code: $?" >> $LOG_FILE;
+      fi
     
-    # Install/update requirements
-    - source venv/bin/activate && pip install -r $DEPLOYPATH/Backend/requirements.txt
+    # List venv contents
+    - ls -la venv/ >> $LOG_FILE 2>&1
+    
+    # === INSTALL REQUIREMENTS ===
+    - echo "=== INSTALLING REQUIREMENTS ===" >> $LOG_FILE
+    - echo "Activating venv..." >> $LOG_FILE
+    - source venv/bin/activate && echo "venv activated" >> $LOG_FILE
+    - source venv/bin/activate && pip install --upgrade pip >> $LOG_FILE 2>&1
+    - source venv/bin/activate && pip install -r $DEPLOYPATH/Backend/requirements.txt >> $LOG_FILE 2>&1
+    - echo "pip install exit code: $?" >> $LOG_FILE
+    - source venv/bin/activate && pip list >> $LOG_FILE 2>&1
+    
+    # === DJANGO COMMANDS ===
+    - echo "=== DJANGO COMMANDS ===" >> $LOG_FILE
     
     # Collect static files
-    - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py collectstatic --noinput
+    - cd $DEPLOYPATH/Backend/mysite
+    - echo "Collecting static files..." >> $LOG_FILE
+    - source ../venv/bin/activate && python manage.py collectstatic --noinput >> $LOG_FILE 2>&1
+    - echo "collectstatic exit code: $?" >> $LOG_FILE
     
-    # Run database migrations (uncomment after first successful deployment)
-    # - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py migrate --noinput
+    # Check if migrate should run (commented by default)
+    # - echo "Running migrations..." >> $LOG_FILE
+    # - source ../venv/bin/activate && python manage.py migrate --noinput >> $LOG_FILE 2>&1
+    # - echo "migrate exit code: $?" >> $LOG_FILE
     
-    # Restart the application (touch wsgi.py to reload)
+    # === RESTART APPLICATION ===
+    - echo "=== RESTARTING APPLICATION ===" >> $LOG_FILE
     - touch $DEPLOYPATH/Backend/mysite/mysite/wsgi.py
+    - echo "wsgi.py touched" >> $LOG_FILE
     
-    # Create a deployment marker (for verification)
-    - echo "Deployed on $(date)" > $DEPLOYPATH/Backend/deploy.log
+    # === FINAL CHECK ===
+    - echo "=== FINAL CHECK ===" >> $LOG_FILE
+    - ls -la $DEPLOYPATH/Backend/ >> $LOG_FILE 2>&1
+    - ls -la $DEPLOYPATH/Backend/mysite/ >> $LOG_FILE 2>&1
+    
+    # === CREATE DEPLOYMENT MARKER ===
+    - echo "=== DEPLOYMENT COMPLETE ===" >> $LOG_FILE
+    - echo "Deployment completed at: $(date)" >> $LOG_FILE
+    - echo "=========================================" >> $LOG_FILE
+    
+    # Create a simple success file
+    - echo "Deployment successful on $(date)" > /home/amabaker/public_html/deployment_success.txt
+    
+    # Output log location
+    - echo "Log file created at: $LOG_FILE" >> /home/amabaker/public_html/deployment_status.txt
