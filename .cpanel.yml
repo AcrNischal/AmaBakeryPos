@@ -1,0 +1,32 @@
+deployment:
+  tasks:
+    # Your actual cPanel deployment path
+    - export DEPLOYPATH=/home/amabaker/public_html/
+    
+    # --- Create main application directory ---
+    - mkdir -p $DEPLOYPATH/Backend
+    
+    # --- Copy the entire Backend folder ---
+    - /bin/cp -R Backend $DEPLOYPATH/
+    
+    # --- Set proper permissions ---
+    - find $DEPLOYPATH/Backend -type d -exec chmod 755 {} \;
+    - find $DEPLOYPATH/Backend -type f -exec chmod 644 {} \;
+    
+    # --- Navigate to your Django project ---
+    - cd $DEPLOYPATH/Backend/mysite
+    
+    # --- Create and setup virtual environment ---
+    - test -d venv || python3 -m venv venv
+    - source venv/bin/activate && pip install -r $DEPLOYPATH/Backend/requirements.txt
+    
+    # --- Django specific setup ---
+    # Collect static files
+    - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py collectstatic --noinput
+    
+    # Run migrations (uncomment after verifying)
+    # - cd $DEPLOYPATH/Backend/mysite && source ../venv/bin/activate && python manage.py migrate
+    
+    # --- Restart your application ---
+    # For Passenger (common in cPanel)
+    - touch $DEPLOYPATH/Backend/mysite/mysite/wsgi.py
